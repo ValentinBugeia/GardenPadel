@@ -6,7 +6,7 @@ const Footer = () => (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr] gap-12 mb-12">
         <div>
           <a href="#accueil" className="inline-flex items-center gap-3">
-            <Logo id="petals-footer" />
+            <Logo />
             <div className="flex flex-col leading-tight">
               <span className="text-lg font-black text-garden-blue">GARDen</span>
               <span className="text-[0.5rem] font-extrabold tracking-[0.35em] uppercase text-white/35">Padel</span>

@@ -66,7 +66,7 @@ const Navbar = () => {
         <div className="container">
           <div className="flex items-center justify-between gap-6">
             <a href="#accueil" className="flex items-center gap-3 flex-shrink-0" aria-label="Garden Padel – accueil" onClick={(e) => { e.preventDefault(); scrollTo("#accueil"); }}>
-              <Logo id="petals-nav" />
+              <Logo />
               <div className="flex flex-col leading-tight">
                 <span className={`text-lg font-black tracking-tight ${isHero ? "text-white" : "text-garden-blue"}`}>GARDen</span>
                 <span className={`text-[0.5rem] font-extrabold tracking-[0.35em] uppercase ${isHero ? "text-white/55" : "text-garden-blue-dark"}`}>Padel</span>

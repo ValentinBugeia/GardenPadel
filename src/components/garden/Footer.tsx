@@ -5,12 +5,8 @@ const Footer = () => (
     <div className="container">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr] gap-12 mb-12">
         <div>
-          <a href="#accueil" className="inline-flex items-center gap-3">
+          <a href="#accueil" className="inline-flex items-center">
             <Logo />
-            <div className="flex flex-col leading-tight">
-              <span className="text-lg font-black text-garden-blue">GARDen</span>
-              <span className="text-[0.5rem] font-extrabold tracking-[0.35em] uppercase text-white/35">Padel</span>
-            </div>
           </a>
           <p className="text-sm leading-relaxed mt-3.5 text-white/[0.42]">Où le sport rencontre la sérénité. 3 terrains FFT, club house &amp; restaurant à Six-Fours-Les-Plages, Var.</p>
         </div>

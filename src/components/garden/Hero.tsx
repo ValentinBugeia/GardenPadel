@@ -1,3 +1,5 @@
+import heroBg from "@/assets/hero-padel.jpg";
+
 const Hero = () => {
   const scrollTo = (href: string) => {
     const el = document.querySelector(href);

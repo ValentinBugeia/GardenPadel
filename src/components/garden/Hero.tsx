@@ -1,3 +1,4 @@
+import { Target, Trophy } from "lucide-react";
 import heroBg from "@/assets/hero-padel.jpg";
 
 const Hero = () => {
@@ -32,8 +33,8 @@ const Hero = () => {
             3 terrains, club house &amp; restaurant.
           </p>
           <div className="flex flex-wrap gap-3.5 animate-fade-in-up-delay3">
-            <a href="#courts" className="inline-flex items-center gap-2 px-6 py-3 rounded-pill font-bold text-[0.92rem] bg-garden-blue text-white shadow-blue transition-all duration-300 hover:bg-garden-blue-dark hover:-translate-y-0.5" onClick={(e) => { e.preventDefault(); scrollTo("#courts"); }}>🎾 Réserver un Court</a>
-            <a href="#tournois" className="inline-flex items-center gap-2 px-6 py-3 rounded-pill font-bold text-[0.92rem] bg-white text-garden-blue-dark shadow-[0_6px_24px_rgba(0,0,0,0.1)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(0,0,0,0.15)]" onClick={(e) => { e.preventDefault(); scrollTo("#tournois"); }}>🏆 Nos Tournois</a>
+            <a href="#courts" className="inline-flex items-center gap-2 px-6 py-3 rounded-pill font-bold text-[0.92rem] bg-garden-blue text-white shadow-blue transition-all duration-300 hover:bg-garden-blue-dark hover:-translate-y-0.5" onClick={(e) => { e.preventDefault(); scrollTo("#courts"); }}><Target className="w-4 h-4" /> Réserver un Court</a>
+            <a href="#tournois" className="inline-flex items-center gap-2 px-6 py-3 rounded-pill font-bold text-[0.92rem] bg-white text-garden-blue-dark shadow-[0_6px_24px_rgba(0,0,0,0.1)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(0,0,0,0.15)]" onClick={(e) => { e.preventDefault(); scrollTo("#tournois"); }}><Trophy className="w-4 h-4" /> Nos Tournois</a>
           </div>
         </div>
 

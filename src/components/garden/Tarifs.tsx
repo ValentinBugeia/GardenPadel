@@ -1,3 +1,5 @@
+import { ClipboardList, Clock, Euro } from "lucide-react";
+
 const horaires = [
   { jour: "Lundi – Vendredi", h: "08h00 – 23h00" },
   { jour: "Samedi", h: "08h00 – 23h00" },
@@ -16,14 +18,14 @@ const Tarifs = () => (
   <section className="py-24" id="tarifs">
     <div className="container">
       <div>
-        <span className="inline-flex items-center gap-1.5 bg-garden-blue-light text-garden-blue-dark text-[0.72rem] font-bold tracking-[0.1em] uppercase px-4 py-1.5 rounded-pill mb-3.5">📋 Pratique</span>
+        <span className="inline-flex items-center gap-1.5 bg-garden-blue-light text-garden-blue-dark text-[0.72rem] font-bold tracking-[0.1em] uppercase px-4 py-1.5 rounded-pill mb-3.5"><ClipboardList className="w-3 h-3" /> Pratique</span>
         <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-extrabold leading-tight mb-3.5 text-foreground">Horaires &amp; Tarifs</h2>
         <p className="text-base text-muted-foreground leading-relaxed max-w-[540px]">Des tarifs transparents pour profiter du club à tout moment.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-14 mt-14 items-start">
         <div>
-          <h3 className="text-base font-bold mb-4 text-foreground">⏰ Horaires d'ouverture</h3>
+          <h3 className="inline-flex items-center gap-2 text-base font-bold mb-4 text-foreground"><Clock className="w-4 h-4" /> Horaires d'ouverture</h3>
           <table className="w-full border-collapse rounded-lg overflow-hidden">
             <thead>
               <tr><th className="bg-garden-blue text-white px-4 py-3 text-sm font-bold text-left">Jour</th><th className="bg-garden-blue text-white px-4 py-3 text-sm font-bold text-left">Horaires</th></tr>
@@ -37,7 +39,7 @@ const Tarifs = () => (
         </div>
 
         <div>
-          <h3 className="text-base font-bold mb-4 text-foreground">💶 Tarifs</h3>
+          <h3 className="inline-flex items-center gap-2 text-base font-bold mb-4 text-foreground"><Euro className="w-4 h-4" /> Tarifs</h3>
           <div className="flex flex-col gap-3">
             {tarifs.map((t) => (
               <div key={t.label} className={`bg-card rounded-[14px] px-5 py-4 shadow-card flex justify-between items-center border-l-4 transition-all duration-300 ${t.color === "pink" ? "border-l-garden-pink hover:shadow-pink hover:translate-x-1" : "border-l-garden-blue hover:shadow-blue hover:translate-x-1"}`}>

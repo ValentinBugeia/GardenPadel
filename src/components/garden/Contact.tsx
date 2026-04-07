@@ -1,21 +1,24 @@
+import { MapPin, Mail, Clock } from "lucide-react";
+import { type ReactNode } from "react";
+
 const Contact = () => (
   <section className="py-24 bg-background" id="contact">
     <div className="container">
       <div>
-        <span className="inline-flex items-center gap-1.5 bg-garden-blue-light text-garden-blue-dark text-[0.72rem] font-bold tracking-[0.1em] uppercase px-4 py-1.5 rounded-pill mb-3.5">📍 Nous trouver</span>
+        <span className="inline-flex items-center gap-1.5 bg-garden-blue-light text-garden-blue-dark text-[0.72rem] font-bold tracking-[0.1em] uppercase px-4 py-1.5 rounded-pill mb-3.5"><MapPin className="w-3 h-3" /> Nous trouver</span>
         <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-extrabold leading-tight mb-3.5 text-foreground">Venez nous rendre visite</h2>
         <p className="text-base text-muted-foreground leading-relaxed max-w-[540px]">À Six-Fours-Les-Plages, dans le Var, à deux pas de la Méditerranée.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_1.6fr] gap-14 mt-14">
         <div className="flex flex-col gap-4">
-          {[
-            { icon: "📍", label: "Adresse", value: "Six-Fours-Les-Plages\nVar (83), France" },
-            { icon: "📧", label: "Email", value: "contact@gardenpadel.fr", isLink: true },
-            { icon: "⏰", label: "Ouverture", value: "7 jours sur 7 · Dès 8h00" },
-          ].map((item) => (
+          {([
+            { icon: <MapPin className="w-5 h-5" />, label: "Adresse", value: "Six-Fours-Les-Plages\nVar (83), France" },
+            { icon: <Mail className="w-5 h-5" />, label: "Email", value: "contact@gardenpadel.fr", isLink: true },
+            { icon: <Clock className="w-5 h-5" />, label: "Ouverture", value: "7 jours sur 7 · Dès 8h00" },
+          ] as { icon: ReactNode; label: string; value: string; isLink?: boolean }[]).map((item) => (
             <div key={item.label} className="flex gap-4 bg-card rounded-[14px] p-4 shadow-card transition-transform duration-300 hover:translate-x-1">
-              <div className="w-[46px] h-[46px] rounded-xl bg-garden-blue-light text-garden-blue-dark flex items-center justify-center text-xl flex-shrink-0">{item.icon}</div>
+              <div className="w-[46px] h-[46px] rounded-xl bg-garden-blue-light text-garden-blue-dark flex items-center justify-center flex-shrink-0">{item.icon}</div>
               <div>
                 <div className="text-[0.7rem] uppercase tracking-wider text-muted-foreground font-semibold mb-0.5">{item.label}</div>
                 {item.isLink ? (

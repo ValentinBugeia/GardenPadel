@@ -1,3 +1,5 @@
+import heroBg from "@/assets/hero-padel.jpg";
+
 const Hero = () => {
   const scrollTo = (href: string) => {
     const el = document.querySelector(href);
@@ -10,7 +12,7 @@ const Hero = () => {
       <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#0d2035] to-[#1a3a55]">
         <div
           className="absolute inset-0 opacity-[0.38] animate-hero-zoom bg-cover bg-center"
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=1600&q=80')" }}
+          style={{ backgroundImage: `url('${heroBg}')` }}
           aria-hidden="true"
         />
       </div>

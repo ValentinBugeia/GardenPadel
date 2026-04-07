@@ -5,10 +5,8 @@ const Logo = () => (
     src={logoSrc}
     alt=""
     aria-hidden="true"
-    className="w-[46px] h-[46px] flex-shrink-0"
+    className="h-[46px] w-auto flex-shrink-0"
     style={{ mixBlendMode: "multiply" }}
-    width={46}
-    height={46}
   />
 );
 

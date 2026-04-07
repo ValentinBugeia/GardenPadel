@@ -65,12 +65,8 @@ const Navbar = () => {
       <nav className={`fixed top-0 left-0 right-0 z-[900] transition-all duration-400 ${scrolled ? "bg-white/94 backdrop-blur-[20px] shadow-[0_2px_24px_rgba(137,201,235,0.1)] py-3" : "py-[18px]"}`}>
         <div className="container">
           <div className="flex items-center justify-between gap-6">
-            <a href="#accueil" className="flex items-center gap-3 flex-shrink-0" aria-label="Garden Padel – accueil" onClick={(e) => { e.preventDefault(); scrollTo("#accueil"); }}>
+            <a href="#accueil" className="flex items-center flex-shrink-0" aria-label="Garden Padel – accueil" onClick={(e) => { e.preventDefault(); scrollTo("#accueil"); }}>
               <Logo />
-              <div className="flex flex-col leading-tight">
-                <span className={`text-lg font-black tracking-tight ${isHero ? "text-white" : "text-garden-blue"}`}>GARDen</span>
-                <span className={`text-[0.5rem] font-extrabold tracking-[0.35em] uppercase ${isHero ? "text-white/55" : "text-garden-blue-dark"}`}>Padel</span>
-              </div>
             </a>
 
             <ul className="hidden md:flex items-center gap-0.5">

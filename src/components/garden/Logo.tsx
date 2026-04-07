@@ -1,4 +1,4 @@
-import logoSrc from "@/assets/logo-garden.webp";
+import logoSrc from "@/assets/logo-garden-transparent.png";
 
 const Logo = () => (
   <img
@@ -6,7 +6,8 @@ const Logo = () => (
     alt=""
     aria-hidden="true"
     className="h-[58px] w-auto flex-shrink-0"
-    style={{ mixBlendMode: "multiply" }}
+    width={58}
+    height={58}
   />
 );
 

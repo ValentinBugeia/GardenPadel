@@ -25,7 +25,7 @@ const Particles = () => {
     return () => { container.innerHTML = ""; };
   }, []);
 
-  return <div ref={ref} className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-55" aria-hidden="true" />;
+  return <div ref={ref} className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden opacity-55" aria-hidden="true" />;
 };
 
 export default Particles;

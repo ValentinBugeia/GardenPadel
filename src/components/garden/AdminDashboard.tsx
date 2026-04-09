@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil } from "lucide-react";
 import flowerBlue from "@/assets/flower-blue.png";
 import { useAuth, type User } from "@/contexts/AuthContext";
@@ -113,6 +113,13 @@ const AdminDashboard = ({ open, onClose }: Props) => {
       setUserBadges(JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}"));
     }
   }, [open, tab]);
+
+  // IDs des membres ayant la permission "book_free"
+  const bookFreeIds = useMemo(() => new Set(
+    Object.entries(userBadges)
+      .filter(([, ids]) => ids.some(bid => badges.find(b => b.id === bid)?.permissions.includes("book_free")))
+      .map(([userId]) => userId)
+  ), [badges, userBadges]);
 
   const reservations: Reservation[] = JSON.parse(localStorage.getItem(STORAGE_RESERVATIONS) || "[]");
   const days = getWeekDays(weekOffset * 7);
@@ -299,7 +306,16 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                       <td className="px-5 py-3.5 text-muted-foreground max-w-[140px] truncate">{u.address}</td>
                       <td className="px-5 py-3.5"><span className={`inline-block px-2.5 py-0.5 rounded-pill text-[0.7rem] font-bold ${LEVEL_COLORS[u.level] || "bg-muted text-muted-foreground"}`}>{u.level}</span></td>
                       <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-1.5"><img src={flowerBlue} alt="crédit" className="h-4 w-auto" /><span className="text-sm font-bold text-garden-blue-dark">{u.credits ?? 0}</span></div>
+                        <div className="flex items-center gap-1.5">
+                          {bookFreeIds.has(u.id) ? (
+                            <span className="text-lg font-black text-garden-blue leading-none">∞</span>
+                          ) : (
+                            <>
+                              <img src={flowerBlue} alt="crédit" className="h-4 w-auto" />
+                              <span className="text-sm font-bold text-garden-blue-dark">{u.credits ?? 0}</span>
+                            </>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-3.5 text-muted-foreground text-xs">{new Date(u.createdAt).toLocaleDateString("fr-FR")}</td>
                     </tr>

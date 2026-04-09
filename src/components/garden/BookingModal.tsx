@@ -78,7 +78,7 @@ const BookingModal = ({ open, onClose }: Props) => {
 
   const availableTerrains = useMemo(
     () => (selectedDay && selectedSlot ? getAvailableTerrains(selectedDay, selectedSlot) : []),
-    [selectedDay, selectedSlot, step]
+    [selectedDay, selectedSlot]
   );
   const nearestSlot = useMemo(
     () => (selectedDay && selectedSlot && availableTerrains.length === 0 ? getNearestAvailableSlot(selectedDay, selectedSlot) : null),

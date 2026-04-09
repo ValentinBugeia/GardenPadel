@@ -34,6 +34,15 @@ const getWeekDays = (startOffset: number) => {
 
 const inputCls = "w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all";
 
+interface Reservation {
+  id: string;
+  courtId: number;
+  date: string;
+  slot: string;
+  userFirstName: string;
+  userLastName: string;
+}
+
 interface Props { open: boolean; onClose: () => void; }
 
 const MemberDashboard = ({ open, onClose }: Props) => {
@@ -64,17 +73,17 @@ const MemberDashboard = ({ open, onClose }: Props) => {
       setEvents(JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]"));
       setTab(defaultTab);
     }
-  }, [open]);
+  }, [open, defaultTab]);
 
   useEffect(() => {
     if (open) setEvents(JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]"));
     setShowForm(false);
-  }, [tab]);
+  }, [tab, open]);
 
-  const reservations: any[] = JSON.parse(localStorage.getItem(STORAGE_RESERVATIONS) || "[]");
+  const reservations: Reservation[] = JSON.parse(localStorage.getItem(STORAGE_RESERVATIONS) || "[]");
   const days = getWeekDays(weekOffset * 7);
   const getResForDayAndCourt = (date: string, courtId: number) =>
-    reservations.filter(r => r.date === date && r.courtId === courtId).sort((a: any, b: any) => a.slot.localeCompare(b.slot));
+    reservations.filter(r => r.date === date && r.courtId === courtId).sort((a, b) => a.slot.localeCompare(b.slot));
 
   const saveEvent = (type: "coaching" | "soiree") => {
     if (!form.title || !form.date) return;
@@ -190,7 +199,7 @@ const MemberDashboard = ({ open, onClose }: Props) => {
               </div>
               <div className="flex flex-col divide-y divide-border">
                 {days.map(day => {
-                  const dayRes = reservations.filter((r: any) => r.date === day.key);
+                  const dayRes = reservations.filter((r) => r.date === day.key);
                   const dayEvs    = events.filter(e => e.date === day.key && e.courtIds.length > 0);
                   const globalEvs = events.filter(e => e.date === day.key && e.courtIds.length === 0);
                   return (
@@ -230,7 +239,7 @@ const MemberDashboard = ({ open, onClose }: Props) => {
                                       <div className="text-[0.7rem] font-semibold text-muted-foreground mt-0.5 truncate">{e.title}</div>
                                     </div>
                                   ))}
-                                  {courtRes.map((r: any) => (
+                                  {courtRes.map((r) => (
                                     <div key={r.id} className={`rounded-xl px-3 py-2 border ${court.bg} ${court.border}`}>
                                       <div className={`text-[0.7rem] font-black ${court.text}`}>{r.slot}</div>
                                       <div className="text-[0.7rem] font-semibold text-foreground mt-0.5">{r.userFirstName} {r.userLastName}</div>

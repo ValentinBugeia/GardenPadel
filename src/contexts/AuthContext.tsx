@@ -65,13 +65,13 @@ const STORAGE_EVENTS = "gp_admin_events";
   ];
   const seedIds = new Set(seeds.map(s => s.id));
   // Les badges seeds sont toujours écrasés avec les dernières permissions ; les badges custom sont préservés
-  const customBadges = stored.filter((b: any) => !seedIds.has(b.id));
+  const customBadges = stored.filter((b) => !seedIds.has(b.id));
   localStorage.setItem(STORAGE_BADGES, JSON.stringify([...seeds, ...customBadges]));
 })();
 
 // ── Seed événements (synchrone, au chargement du module) ──────────────────
 ;(() => {
-  const stored: { id: string }[] = JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]");
+  const stored: { id: string; date: string }[] = JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]");
   const existingIds = new Set(stored.map(e => e.id));
   const seeds = [
     // ── Tournois ───────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ const STORAGE_EVENTS = "gp_admin_events";
   ];
   const toAdd = seeds.filter(s => !existingIds.has(s.id));
   if (toAdd.length > 0) {
-    const merged = [...stored, ...toAdd].sort((a: any, b: any) => a.date.localeCompare(b.date));
+    const merged = [...stored, ...toAdd].sort((a, b) => a.date.localeCompare(b.date));
     localStorage.setItem(STORAGE_EVENTS, JSON.stringify(merged));
   }
 })();
@@ -123,7 +123,7 @@ const STORAGE_EVENTS = "gp_admin_events";
 ;(() => {
   const STORAGE_RES = "gp_reservations";
   const stored: { id: string }[] = JSON.parse(localStorage.getItem(STORAGE_RES) || "[]");
-  const existingIds = new Set(stored.map((r: any) => r.id));
+  const existingIds = new Set(stored.map((r) => r.id));
   const u = (id: string, fn: string, ln: string) => ({ id, firstName: fn, lastName: ln });
   const seeds = [
     // ── Avril 2026 ──────────────────────────────────────────────────────

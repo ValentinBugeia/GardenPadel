@@ -17,7 +17,7 @@ const Logo = ({ variant = "blue" }: Props) => {
       setVisible(true);
     }, 180);
     return () => clearTimeout(t);
-  }, [variant]);
+  }, [variant, displayed]);
 
   return (
     <img

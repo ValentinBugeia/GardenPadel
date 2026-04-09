@@ -1,41 +1,63 @@
-import { Target, Trophy, Leaf, Sparkles } from "lucide-react";
+import { Target, Trophy, Leaf } from "lucide-react";
 import { type ReactNode } from "react";
 
-const services: { icon: ReactNode; title: string; text: string; link: string; linkText: string; color: "blue" | "pink" | "gray" }[] = [
-  { icon: <Target className="w-8 h-8" />, title: "Entraînements de Pro", text: "Améliorez votre jeu avec nos coachs certifiés. Cours individuels, collectifs et stages pour tous les niveaux.", link: "#courts", linkText: "En savoir plus →", color: "blue" },
-  { icon: <Trophy className="w-8 h-8" />, title: "Tournois Communautaires", text: "Rejoignez nos compétitions mensuelles. Tournois mixtes, dames, juniors et open pour tous les niveaux.", link: "#tournois", linkText: "Voir le calendrier →", color: "pink" },
-  { icon: <Leaf className="w-8 h-8" />, title: "Le Garden Resto", text: "Une cuisine fraîche et saine après le match. Brunchs, cocktails et assiettes healthy dans un cadre verdoyant.", link: "#clubhouse", linkText: "Découvrir →", color: "gray" },
+const services: { icon: ReactNode; title: string; text: string; link: string; linkText: string; accent: string }[] = [
+  { icon: <Target className="w-5 h-5" />, title: "Entraînements de Pro", text: "Améliorez votre jeu avec nos coachs certifiés. Cours individuels, collectifs et stages pour tous les niveaux.", link: "#courts", linkText: "En savoir plus", accent: "text-garden-blue-dark bg-garden-blue-light" },
+  { icon: <Trophy className="w-5 h-5" />, title: "Tournois Communautaires", text: "Rejoignez nos compétitions mensuelles. Tournois mixtes, dames, juniors et open pour tous les niveaux.", link: "#tournois", linkText: "Voir le calendrier", accent: "text-garden-pink-dark bg-garden-pink-light" },
+  { icon: <Leaf className="w-5 h-5" />, title: "Le Garden Resto", text: "Une cuisine fraîche et saine après le match. Brunchs, cocktails et assiettes healthy dans un cadre verdoyant.", link: "#clubhouse", linkText: "Découvrir", accent: "text-foreground bg-muted" },
 ];
 
-const colorMap = {
-  blue: { wrap: "bg-garden-blue-light text-garden-blue-dark", title: "text-garden-blue-dark", link: "text-garden-blue-dark" },
-  pink: { wrap: "bg-garden-pink-light text-garden-pink-dark", title: "text-garden-pink-dark", link: "text-garden-pink-dark" },
-  gray: { wrap: "bg-muted text-foreground", title: "text-foreground", link: "text-foreground" },
-};
-
 const Services = () => (
-  <section className="py-24" id="services">
+  <section className="py-28" id="services">
     <div className="container">
-      <div className="text-center">
-        <span className="inline-flex items-center gap-1.5 bg-garden-blue-light text-garden-blue-dark text-[0.72rem] font-bold tracking-[0.1em] uppercase px-4 py-1.5 rounded-pill mb-3.5"><Sparkles className="w-3 h-3" /> Nos Services</span>
-        <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-extrabold leading-tight mb-3.5 text-foreground">Tout ce qu'il vous faut<br />pour jouer &amp; profiter</h2>
-        <p className="text-base text-muted-foreground leading-relaxed max-w-[540px] mx-auto">Du padel de haut niveau à une table dressée après le match — Garden Padel, c'est bien plus qu'un club.</p>
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-16">
+        <div>
+          <span className="text-[0.7rem] font-semibold tracking-[0.18em] uppercase text-garden-blue-dark mb-3 block">Nos Services</span>
+          <h2 className="text-4xl md:text-5xl font-black tracking-tighter leading-[1.05] text-foreground">
+            Tout ce qu'il vous faut<br className="hidden md:block" /> pour jouer &amp; profiter
+          </h2>
+        </div>
+        <p className="text-base text-muted-foreground leading-relaxed max-w-[380px] md:text-right">
+          Du padel de haut niveau à une table dressée après le match.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-14">
-        {services.map((s) => {
-          const c = colorMap[s.color];
-          return (
-            <div key={s.title} className="bg-card rounded-lg p-10 pb-9 text-center border border-black/5 shadow-card flex flex-col items-center transition-all duration-400 cursor-default hover:-translate-y-3.5 hover:shadow-[0_24px_48px_rgba(0,0,0,0.09)] group">
-              <div className={`w-[76px] h-[76px] rounded-full flex items-center justify-center mb-5 ${c.wrap}`}>
-                <span className="group-hover:animate-wiggle inline-block">{s.icon}</span>
+      <div className="divide-y divide-border">
+        {services.map((s, i) => (
+          <div
+            key={s.title}
+            className="group grid grid-cols-[3rem_1fr] md:grid-cols-[4rem_1fr_auto] gap-6 md:gap-10 py-10 items-start hover:bg-muted/40 transition-colors duration-200 -mx-4 px-4 rounded-xl"
+          >
+            {/* Number */}
+            <span className="text-[2.2rem] font-black tracking-tighter text-muted-foreground/25 leading-none pt-1 select-none">
+              0{i + 1}
+            </span>
+
+            {/* Content */}
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${s.accent}`}>
+                  {s.icon}
+                </span>
+                <h3 className="text-xl font-bold tracking-tight text-foreground">{s.title}</h3>
               </div>
-              <h3 className={`text-lg font-extrabold mb-2.5 ${c.title}`}>{s.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{s.text}</p>
-              <a href={s.link} className={`inline-flex items-center gap-1.5 text-[0.83rem] font-bold mt-4 transition-all hover:gap-2.5 ${c.link}`}>{s.linkText}</a>
+              <p className="text-[0.92rem] text-muted-foreground leading-relaxed max-w-[480px]">{s.text}</p>
+              <a
+                href={s.link}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold mt-4 text-garden-blue-dark transition-all duration-200 hover:gap-3"
+              >
+                {s.linkText} →
+              </a>
             </div>
-          );
-        })}
+
+            {/* Arrow on hover — desktop only */}
+            <div className="hidden md:flex items-center self-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <div className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-muted-foreground">
+                →
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   </section>

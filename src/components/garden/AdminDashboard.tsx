@@ -1,0 +1,687 @@
+import { useState, useEffect } from "react";
+import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil } from "lucide-react";
+import flowerBlue from "@/assets/flower-blue.png";
+import { useAuth, type User } from "@/contexts/AuthContext";
+
+interface Props { open: boolean; onClose: () => void; }
+
+interface Reservation {
+  id: string; courtId: number; courtName: string;
+  date: string; slot: string; userId: string;
+  userFirstName: string; userLastName: string; userEmail: string; createdAt: string;
+}
+
+export interface AdminEvent {
+  id: string;
+  type: "seminaire" | "coaching" | "soiree" | "tournoi" | "autre";
+  title: string;
+  date: string;
+  slot: string;        // "" if no terrain involved
+  courtIds: number[];  // [] if no terrain
+  maxPlaces?: number;  // coaching only
+  desc: string;
+  createdAt: string;
+}
+
+const STORAGE_RESERVATIONS = "gp_reservations";
+export const STORAGE_EVENTS    = "gp_admin_events";
+export const STORAGE_BADGES    = "gp_badges";
+export const STORAGE_USER_BADGES = "gp_user_badges";
+
+export interface Badge {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string; // hex
+  permissions: string[];
+  createdAt: string;
+}
+
+const AVAILABLE_PERMISSIONS = [
+  { id: "book_free",       label: "Réserver sans crédits" },
+  { id: "manage_coaching", label: "Gérer les événements coaching" },
+  { id: "manage_soirees",  label: "Gérer les événements soirées" },
+  { id: "view_planning",   label: "Voir le planning" },
+  { id: "admin_access",    label: "Accès panel Admin" },
+];
+
+const LEVEL_COLORS: Record<string, string> = {
+  "Débutant": "bg-muted text-muted-foreground",
+  "P25": "bg-garden-blue-light text-garden-blue-dark",
+  "P50": "bg-garden-blue-light text-garden-blue-dark",
+  "P100": "bg-garden-blue-light text-garden-blue-dark",
+  "P250": "bg-garden-pink-light text-garden-pink-dark",
+  "P500": "bg-garden-pink-light text-garden-pink-dark",
+  "P1000+": "bg-garden-pink text-white",
+};
+
+const COURTS = [
+  { id: 1, name: "Le Jardin Bleu",    icon: <Target  className="w-3.5 h-3.5" />, bg: "bg-gradient-to-br from-[#89c9eb]/30 to-[#6ab5db]/50", text: "text-garden-blue-dark",  border: "border-garden-blue/40" },
+  { id: 2, name: "La Rose des Vents", icon: <Medal   className="w-3.5 h-3.5" />, bg: "bg-gradient-to-br from-[#e98eaa]/30 to-[#d87594]/50", text: "text-garden-pink-dark",  border: "border-garden-pink/40" },
+  { id: 3, name: "La Terrasse Rose",  icon: <Flower2 className="w-3.5 h-3.5" />, bg: "bg-gradient-to-br from-[#89c9eb]/20 to-[#e98eaa]/30", text: "text-garden-pink-dark",  border: "border-garden-pink/30" },
+];
+
+const EVENT_TYPES = [
+  { value: "tournoi",   label: "Tournoi",    icon: <Trophy      className="w-4 h-4" />, color: "bg-garden-blue text-white",           light: "bg-garden-blue-light",  usesTerrain: false },
+  { value: "seminaire", label: "Séminaire",  icon: <Briefcase   className="w-4 h-4" />, color: "bg-foreground/80 text-white",         light: "bg-muted",              usesTerrain: true  },
+  { value: "coaching",  label: "Coaching",   icon: <Dumbbell    className="w-4 h-4" />, color: "bg-garden-blue text-white",           light: "bg-garden-blue-light",  usesTerrain: true  },
+  { value: "soiree",    label: "Soirée",     icon: <PartyPopper className="w-4 h-4" />, color: "bg-garden-pink text-white",           light: "bg-garden-pink-light",  usesTerrain: false },
+  { value: "autre",     label: "Autre",      icon: <MoreHorizontal className="w-4 h-4" />, color: "bg-muted-foreground text-white",  light: "bg-muted",              usesTerrain: false },
+] as const;
+
+const SLOTS = [
+  "08:00 – 09:30","09:30 – 11:00","11:00 – 12:30",
+  "12:30 – 14:00","14:00 – 15:30","15:30 – 17:00",
+  "17:00 – 18:30","18:30 – 20:00","20:00 – 21:30",
+];
+
+const DAY_NAMES   = ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
+const MONTH_NAMES = ["jan.","fév.","mar.","avr.","mai","juin","juil.","août","sep.","oct.","nov.","déc."];
+
+const getWeekDays = (startOffset: number) => {
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(); d.setDate(d.getDate() + startOffset + i);
+    days.push({ key: d.toISOString().split("T")[0], label: `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`, isToday: startOffset + i === 0 });
+  }
+  return days;
+};
+
+const inputCls = "w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all";
+
+const AdminDashboard = ({ open, onClose }: Props) => {
+  const { users, logout } = useAuth();
+  const [search, setSearch]     = useState("");
+  const [tab, setTab]           = useState<"members"|"reservations"|"events"|"badges">("members");
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  // Events state
+  const [events, setEvents]         = useState<AdminEvent[]>(() => JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]"));
+  const [showForm, setShowForm]     = useState(false);
+  const [form, setForm]             = useState({ type: "seminaire" as AdminEvent["type"], title: "", date: "", slot: "", courtIds: [] as number[], maxPlaces: 8, desc: "" });
+
+  // Badges state
+  const [badges, setBadges]             = useState<Badge[]>(() => JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]"));
+  const [userBadges, setUserBadges]     = useState<Record<string, string[]>>(() => JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}"));
+  const [badgeEditState, setBadgeEditState] = useState<{ id?: string; name: string; emoji: string; color: string; permissions: string[] } | null>(null);
+
+  // Rechargement localStorage à chaque ouverture / changement d'onglet
+  useEffect(() => {
+    if (open) {
+      setEvents(JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]"));
+      setBadges(JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]"));
+      setUserBadges(JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}"));
+    }
+  }, [open, tab]);
+
+  const reservations: Reservation[] = JSON.parse(localStorage.getItem(STORAGE_RESERVATIONS) || "[]");
+  const days = getWeekDays(weekOffset * 7);
+
+  const filteredUsers = users.filter(u =>
+    `${u.firstName} ${u.lastName} ${u.email} ${u.level}`.toLowerCase().includes(search.toLowerCase())
+  );
+  const getResForDayAndCourt = (date: string, courtId: number) =>
+    reservations.filter(r => r.date === date && r.courtId === courtId).sort((a, b) => a.slot.localeCompare(b.slot));
+
+  const handleLogout = () => { logout(); onClose(); };
+
+  const selectedType = EVENT_TYPES.find(t => t.value === form.type)!;
+
+  const toggleCourt = (id: number) =>
+    setForm(f => ({ ...f, courtIds: f.courtIds.includes(id) ? f.courtIds.filter(c => c !== id) : [...f.courtIds, id] }));
+
+  const saveEvent = () => {
+    if (!form.title || !form.date) return;
+    if (selectedType.usesTerrain && (!form.slot || form.courtIds.length === 0)) return;
+    const ev: AdminEvent = {
+      id: `ev-${Date.now()}`, type: form.type, title: form.title, date: form.date,
+      slot: form.slot, courtIds: form.courtIds, desc: form.desc,
+      ...(form.type === "coaching" ? { maxPlaces: form.maxPlaces } : {}),
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...events, ev].sort((a, b) => a.date.localeCompare(b.date));
+    localStorage.setItem(STORAGE_EVENTS, JSON.stringify(updated));
+    setEvents(updated);
+    setForm({ type: "seminaire", title: "", date: "", slot: "", courtIds: [], desc: "" });
+    setShowForm(false);
+  };
+
+  const deleteEvent = (id: string) => {
+    const updated = events.filter(e => e.id !== id);
+    localStorage.setItem(STORAGE_EVENTS, JSON.stringify(updated));
+    setEvents(updated);
+  };
+
+  // ── Badge CRUD ──────────────────────────────────────────────────────────
+  const saveBadge = () => {
+    if (!badgeEditState || !badgeEditState.name.trim()) return;
+    let updated: Badge[];
+    if (badgeEditState.id) {
+      updated = badges.map(b => b.id === badgeEditState.id ? { ...b, ...badgeEditState } as Badge : b);
+    } else {
+      const newBadge: Badge = { id: `badge-${Date.now()}`, name: badgeEditState.name, emoji: badgeEditState.emoji, color: badgeEditState.color, permissions: badgeEditState.permissions, createdAt: new Date().toISOString() };
+      updated = [...badges, newBadge];
+    }
+    localStorage.setItem(STORAGE_BADGES, JSON.stringify(updated));
+    setBadges(updated);
+    setBadgeEditState(null);
+  };
+
+  const deleteBadge = (id: string) => {
+    const updated = badges.filter(b => b.id !== id);
+    localStorage.setItem(STORAGE_BADGES, JSON.stringify(updated));
+    setBadges(updated);
+    // Retirer ce badge de tous les membres
+    const ub = Object.fromEntries(Object.entries(userBadges).map(([uid, bids]) => [uid, bids.filter(bid => bid !== id)]));
+    localStorage.setItem(STORAGE_USER_BADGES, JSON.stringify(ub));
+    setUserBadges(ub);
+  };
+
+  const toggleUserBadge = (userId: string, badgeId: string) => {
+    const current = userBadges[userId] || [];
+    const updated = current.includes(badgeId)
+      ? { ...userBadges, [userId]: current.filter(id => id !== badgeId) }
+      : { ...userBadges, [userId]: [...current, badgeId] };
+    localStorage.setItem(STORAGE_USER_BADGES, JSON.stringify(updated));
+    setUserBadges(updated);
+  };
+
+  const subLabel = () => {
+    if (tab === "members")      return `${users.length} membre${users.length > 1 ? "s" : ""} inscrit${users.length > 1 ? "s" : ""}`;
+    if (tab === "reservations") return `${reservations.length} réservation${reservations.length > 1 ? "s" : ""}`;
+    if (tab === "events")       return `${events.length} événement${events.length > 1 ? "s" : ""}`;
+    return `${badges.length} badge${badges.length > 1 ? "s" : ""} · ${Object.values(userBadges).flat().length} attribution${Object.values(userBadges).flat().length > 1 ? "s" : ""}`;
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="absolute inset-0 bg-foreground/70 backdrop-blur-md" aria-hidden="true" />
+
+      <div className="relative bg-background rounded-3xl shadow-[0_32px_80px_rgba(0,0,0,0.25)] w-full max-w-[960px] max-h-[90vh] flex flex-col overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-7 pt-6 pb-5 border-b border-border shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-garden-blue-light to-garden-blue flex items-center justify-center">
+              <Users className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black tracking-tight text-foreground">Panel Administrateur</h2>
+              <p className="text-xs text-muted-foreground">{subLabel()}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={handleLogout} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+              <LogOut className="w-4 h-4" /> Déconnexion
+            </button>
+            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="px-7 pt-4 pb-3 border-b border-border shrink-0 flex items-center justify-between gap-3">
+          <div className="flex gap-2">
+            <button onClick={() => setTab("members")} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${tab === "members" ? "bg-garden-blue text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+              <Users className="w-4 h-4" /> Membres
+            </button>
+            <button onClick={() => setTab("reservations")} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${tab === "reservations" ? "bg-garden-blue text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+              <Calendar className="w-4 h-4" /> Réservations
+            </button>
+            <button onClick={() => setTab("events")} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${tab === "events" ? "bg-garden-pink text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+              <PartyPopper className="w-4 h-4" /> Événements
+            </button>
+            <button onClick={() => setTab("badges")} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${tab === "badges" ? "bg-garden-blue text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+              <Shield className="w-4 h-4" /> Badges
+            </button>
+          </div>
+
+          {tab === "members" && (
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un membre..."
+                className="w-full pl-10 pr-4 py-2 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all" />
+            </div>
+          )}
+
+          {tab === "reservations" && (
+            <div className="flex items-center gap-2">
+              <button onClick={() => setWeekOffset(w => w - 1)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"><ChevronLeft className="w-4 h-4" /></button>
+              <span className="text-sm font-semibold text-foreground min-w-[130px] text-center">{days[0].label.split(" ").slice(1).join(" ")} – {days[6].label.split(" ").slice(1).join(" ")}</span>
+              <button onClick={() => setWeekOffset(w => w + 1)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"><ChevronRight className="w-4 h-4" /></button>
+            </div>
+          )}
+
+          {tab === "events" && (
+            <button onClick={() => setShowForm(f => !f)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-garden-pink text-white hover:bg-garden-pink-dark transition-colors">
+              <Plus className="w-4 h-4" /> {showForm ? "Annuler" : "Créer un événement"}
+            </button>
+          )}
+          {tab === "badges" && (
+            <button onClick={() => setBadgeEditState(badgeEditState ? null : { name: "", emoji: "🏅", color: "#6ab5db", permissions: [] })}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-garden-blue text-white hover:bg-garden-blue-dark transition-colors">
+              <Plus className="w-4 h-4" /> {badgeEditState && !badgeEditState.id ? "Annuler" : "Créer un badge"}
+            </button>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto flex-1">
+
+          {/* ── Membres ── */}
+          {tab === "members" && (
+            filteredUsers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Users className="w-10 h-10 text-muted-foreground/30 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">{users.length === 0 ? "Aucun membre inscrit." : "Aucun résultat."}</p>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-background border-b border-border">
+                  <tr>{["Membre","Email","Naissance","Adresse","Niveau","Crédits","Inscrit le"].map(h => (
+                    <th key={h} className="text-left px-5 py-3 text-[0.7rem] font-bold uppercase tracking-[0.1em] text-muted-foreground">{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredUsers.map((u: User) => (
+                    <tr key={u.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-garden-blue-light to-garden-pink-light flex items-center justify-center text-xs font-bold text-garden-blue-dark shrink-0">{u.firstName[0]}{u.lastName[0]}</div>
+                          <span className="font-semibold text-foreground">{u.firstName} {u.lastName}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 text-muted-foreground">{u.email}</td>
+                      <td className="px-5 py-3.5 text-muted-foreground text-xs">{u.birthDate ? new Date(u.birthDate).toLocaleDateString("fr-FR") : "—"}</td>
+                      <td className="px-5 py-3.5 text-muted-foreground max-w-[140px] truncate">{u.address}</td>
+                      <td className="px-5 py-3.5"><span className={`inline-block px-2.5 py-0.5 rounded-pill text-[0.7rem] font-bold ${LEVEL_COLORS[u.level] || "bg-muted text-muted-foreground"}`}>{u.level}</span></td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-1.5"><img src={flowerBlue} alt="crédit" className="h-4 w-auto" /><span className="text-sm font-bold text-garden-blue-dark">{u.credits ?? 0}</span></div>
+                      </td>
+                      <td className="px-5 py-3.5 text-muted-foreground text-xs">{new Date(u.createdAt).toLocaleDateString("fr-FR")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+
+          {/* ── Réservations ── */}
+          {tab === "reservations" && (
+            <div className="flex flex-col">
+              <div className="sticky top-0 z-10 bg-background border-b border-border grid grid-cols-[140px_1fr_1fr_1fr] gap-px">
+                <div className="px-4 py-3" />
+                {COURTS.map(c => (
+                  <div key={c.id} className={`flex items-center gap-2 px-4 py-3 ${c.bg}`}>
+                    <span className={c.text}>{c.icon}</span>
+                    <span className={`text-xs font-bold ${c.text}`}>{c.name}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col divide-y divide-border">
+                {days.map(day => {
+                  const dayRes = reservations.filter(r => r.date === day.key);
+                  const dayEvs    = events.filter(e => e.date === day.key && e.courtIds.length > 0);
+                  const globalEvs = events.filter(e => e.date === day.key && e.courtIds.length === 0);
+                  return (
+                    <div key={day.key} className={day.isToday ? "bg-garden-blue/5" : ""}>
+
+                      {/* ── Bannière événements sans terrain (soirées, tournois…) ── */}
+                      {globalEvs.length > 0 && (
+                        <div className="flex gap-px border-b border-border/40">
+                          <div className={`w-[140px] shrink-0 flex items-center px-4 py-2 ${day.isToday ? "bg-garden-blue/10" : "bg-muted/30"}`}>
+                            <span className="text-[0.6rem] font-bold uppercase tracking-widest text-muted-foreground">Agenda</span>
+                          </div>
+                          <div className="flex-1 bg-background px-3 py-2 flex flex-wrap gap-1.5 items-center">
+                            {globalEvs.map(e => {
+                              const cfg = EVENT_TYPES.find(t => t.value === e.type)!;
+                              return (
+                                <span key={e.id} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${cfg.color}`}>
+                                  {cfg.icon}
+                                  {e.title}{e.slot ? <span className="opacity-75 font-medium"> · {e.slot}</span> : null}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── Grille terrains ── */}
+                      <div className="grid grid-cols-[140px_1fr_1fr_1fr] gap-px">
+                        <div className={`flex flex-col justify-center px-4 py-3 ${day.isToday ? "bg-garden-blue/10" : "bg-muted/30"}`}>
+                          <span className={`text-xs font-black tracking-tight ${day.isToday ? "text-garden-blue-dark" : "text-foreground"}`}>{day.label}</span>
+                          {day.isToday && <span className="text-[0.6rem] font-bold text-garden-blue mt-0.5">Aujourd'hui</span>}
+                          {(dayRes.length + dayEvs.length) > 0 && <span className="text-[0.6rem] text-muted-foreground mt-1">{dayRes.length + dayEvs.length} rés.</span>}
+                        </div>
+                        {COURTS.map(court => {
+                          const courtRes = getResForDayAndCourt(day.key, court.id);
+                          const courtEvs = dayEvs.filter(e => e.courtIds.includes(court.id));
+                          return (
+                            <div key={court.id} className="bg-background p-2.5 flex flex-col gap-1.5 min-h-[56px]">
+                              {courtRes.length === 0 && courtEvs.length === 0 ? (
+                                <div className="flex items-center justify-center h-full"><span className="text-[0.65rem] text-muted-foreground/30">—</span></div>
+                              ) : (
+                                <>
+                                  {courtEvs.map(e => {
+                                    const cfg = EVENT_TYPES.find(t => t.value === e.type)!;
+                                    return (
+                                      <div key={e.id} className={`rounded-xl px-3 py-2 border border-foreground/10 ${cfg.light}`}>
+                                        <div className="flex items-center gap-1"><span className="text-foreground/60">{cfg.icon}</span><span className="text-[0.7rem] font-black text-foreground truncate">{e.slot}</span></div>
+                                        <div className="text-[0.7rem] font-semibold text-muted-foreground mt-0.5 truncate">{e.title}</div>
+                                      </div>
+                                    );
+                                  })}
+                                  {courtRes.map(r => (
+                                    <div key={r.id} className={`rounded-xl px-3 py-2 border ${court.bg} ${court.border}`}>
+                                      <div className={`text-[0.7rem] font-black ${court.text}`}>{r.slot}</div>
+                                      <div className="text-[0.7rem] font-semibold text-foreground mt-0.5">{r.userFirstName} {r.userLastName}</div>
+                                    </div>
+                                  ))}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Badges ── */}
+          {tab === "badges" && (
+            <div className="p-7 flex flex-col lg:flex-row gap-8">
+
+              {/* ── Colonne gauche : définitions des badges ── */}
+              <div className="flex-1 flex flex-col gap-4 min-w-0">
+                <h3 className="text-sm font-black text-foreground flex items-center gap-2"><Shield className="w-4 h-4 text-garden-blue" /> Badges du club</h3>
+
+                {/* Formulaire créer / éditer */}
+                {badgeEditState && (
+                  <div className="bg-muted/30 border border-border rounded-2xl p-4 flex flex-col gap-3">
+                    <p className="text-xs font-black text-foreground">{badgeEditState.id ? "Modifier le badge" : "Nouveau badge"}</p>
+                    <div className="flex gap-2">
+                      <div className="w-[72px]">
+                        <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Emoji</p>
+                        <input className={inputCls} value={badgeEditState.emoji} maxLength={4} onChange={e => setBadgeEditState(s => s && ({ ...s, emoji: e.target.value }))} placeholder="🏅" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Nom</p>
+                        <input className={inputCls} value={badgeEditState.name} onChange={e => setBadgeEditState(s => s && ({ ...s, name: e.target.value }))} placeholder="Ex : Coach, VIP…" />
+                      </div>
+                      <div className="w-[60px]">
+                        <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Couleur</p>
+                        <input type="color" className="w-full h-[38px] rounded-xl border border-border cursor-pointer p-1 bg-background" value={badgeEditState.color} onChange={e => setBadgeEditState(s => s && ({ ...s, color: e.target.value }))} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Droits associés</p>
+                      <div className="grid grid-cols-1 gap-1.5">
+                        {AVAILABLE_PERMISSIONS.map(p => {
+                          const active = badgeEditState.permissions.includes(p.id);
+                          return (
+                            <button key={p.id} onClick={() => setBadgeEditState(s => s && ({ ...s, permissions: active ? s.permissions.filter(x => x !== p.id) : [...s.permissions, p.id] }))}
+                              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-xs font-medium text-left transition-all ${active ? "bg-garden-blue/10 border-garden-blue/30 text-garden-blue-dark" : "bg-background border-border text-muted-foreground hover:text-foreground"}`}>
+                              <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-all ${active ? "bg-garden-blue border-garden-blue" : "border-border"}`}>
+                                {active && <Check className="w-2.5 h-2.5 text-white" />}
+                              </div>
+                              {p.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={() => setBadgeEditState(null)} className="px-4 py-2 rounded-xl text-xs font-semibold bg-muted text-muted-foreground hover:text-foreground transition-colors">Annuler</button>
+                      <button onClick={saveBadge} disabled={!badgeEditState.name.trim()}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-garden-blue text-white hover:bg-garden-blue-dark transition-all disabled:opacity-40">
+                        <Check className="w-3.5 h-3.5" /> {badgeEditState.id ? "Enregistrer" : "Créer"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Liste des badges */}
+                {badges.length === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-10">Aucun badge créé.</div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {badges.map(badge => (
+                      <div key={badge.id} className="flex items-start gap-3 p-3.5 rounded-2xl border border-border bg-background">
+                        <span className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0" style={{ backgroundColor: badge.color + "22" }}>{badge.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full text-white" style={{ backgroundColor: badge.color }}>
+                              {badge.emoji} {badge.name}
+                            </span>
+                          </div>
+                          {badge.permissions.length === 0 ? (
+                            <p className="text-[0.65rem] text-muted-foreground italic">Aucun droit</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {badge.permissions.map(pid => {
+                                const perm = AVAILABLE_PERMISSIONS.find(p => p.id === pid);
+                                return perm ? (
+                                  <span key={pid} className="text-[0.63rem] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{perm.label}</span>
+                                ) : null;
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <button onClick={() => setBadgeEditState({ id: badge.id, name: badge.name, emoji: badge.emoji, color: badge.color, permissions: [...badge.permissions] })}
+                            className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-garden-blue/10 text-muted-foreground hover:text-garden-blue transition-colors">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => deleteBadge(badge.id)}
+                            className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Séparateur vertical */}
+              <div className="hidden lg:block w-px bg-border shrink-0" />
+
+              {/* ── Colonne droite : attribution aux membres ── */}
+              <div className="flex-1 flex flex-col gap-3 min-w-0">
+                <h3 className="text-sm font-black text-foreground flex items-center gap-2"><Users className="w-4 h-4 text-garden-blue" /> Attribution aux membres</h3>
+                {users.length === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-10">Aucun membre.</div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {users.map(u => {
+                      const memberBadgeIds = userBadges[u.id] || [];
+                      const memberBadges = memberBadgeIds.map(bid => badges.find(b => b.id === bid)).filter(Boolean) as Badge[];
+                      const availableBadges = badges.filter(b => !memberBadgeIds.includes(b.id));
+                      return (
+                        <div key={u.id} className="flex items-center gap-3 p-3 rounded-2xl border border-border bg-background">
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-garden-blue-light to-garden-pink-light flex items-center justify-center text-xs font-bold text-garden-blue-dark shrink-0">
+                            {u.firstName[0]}{u.lastName[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground truncate">{u.firstName} {u.lastName}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {memberBadges.length === 0 ? (
+                                <span className="text-[0.65rem] text-muted-foreground italic">Aucun badge</span>
+                              ) : memberBadges.map(badge => (
+                                <button key={badge.id} onClick={() => toggleUserBadge(u.id, badge.id)} title="Cliquer pour retirer"
+                                  className="inline-flex items-center gap-1 text-[0.65rem] font-bold px-2 py-0.5 rounded-full text-white transition-opacity hover:opacity-70"
+                                  style={{ backgroundColor: badge.color }}>
+                                  {badge.emoji} {badge.name} ×
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {availableBadges.length > 0 && (
+                            <select defaultValue="" onChange={e => { if (e.target.value) { toggleUserBadge(u.id, e.target.value); e.target.value = ""; } }}
+                              className="text-[0.7rem] border border-dashed border-border rounded-lg px-2 py-1.5 text-muted-foreground bg-transparent cursor-pointer hover:border-garden-blue hover:text-garden-blue transition-colors shrink-0">
+                              <option value="" disabled>+ Badge</option>
+                              {availableBadges.map(b => <option key={b.id} value={b.id}>{b.emoji} {b.name}</option>)}
+                            </select>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Événements ── */}
+          {tab === "events" && (
+            <div className="p-7 flex flex-col gap-6">
+
+              {/* Formulaire */}
+              {showForm && (
+                <div className="bg-muted/30 border border-border rounded-2xl p-5 flex flex-col gap-4">
+                  <h3 className="text-sm font-black text-foreground">Nouvel événement</h3>
+
+                  {/* Type */}
+                  <div>
+                    <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Type</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {EVENT_TYPES.map(t => (
+                        <button key={t.value} onClick={() => setForm(f => ({ ...f, type: t.value, courtIds: [], slot: "" }))}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${form.type === t.value ? `${t.color} border-transparent shadow-sm` : "bg-background border-border text-muted-foreground hover:text-foreground"}`}>
+                          {t.icon} {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Titre */}
+                    <div className="col-span-2">
+                      <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Titre</p>
+                      <input className={inputCls} placeholder="Ex : Séminaire TotalEnergies" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+                    </div>
+                    {/* Date */}
+                    <div>
+                      <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Date</p>
+                      <input className={inputCls} type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+                    </div>
+                    {/* Créneau (terrain uniquement) */}
+                    {selectedType.usesTerrain && (
+                      <div>
+                        <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Créneau</p>
+                        <select className={inputCls} value={form.slot} onChange={e => setForm(f => ({ ...f, slot: e.target.value }))}>
+                          <option value="">-- Sélectionner --</option>
+                          {SLOTS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {/* Horaires libres (sans terrain) */}
+                    {!selectedType.usesTerrain && (
+                      <div>
+                        <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Horaires <span className="normal-case font-normal">(optionnel)</span></p>
+                        <input className={inputCls} placeholder="Ex : 19h – Minuit" value={form.slot} onChange={e => setForm(f => ({ ...f, slot: e.target.value }))} />
+                      </div>
+                    )}
+                    {/* Nombre de places (coaching uniquement) */}
+                    {form.type === "coaching" && (
+                      <div>
+                        <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Nombre de places</p>
+                        <input className={inputCls} type="number" min="1" max="30"
+                          value={form.maxPlaces}
+                          onChange={e => setForm(f => ({ ...f, maxPlaces: Math.max(1, parseInt(e.target.value) || 1) }))} />
+                      </div>
+                    )}
+                    {/* Terrains (terrain uniquement) */}
+                    {selectedType.usesTerrain && (
+                      <div className="col-span-2">
+                        <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Terrains réservés</p>
+                        <div className="flex gap-2">
+                          {COURTS.map(c => (
+                            <button key={c.id} onClick={() => toggleCourt(c.id)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${form.courtIds.includes(c.id) ? `${c.bg} ${c.border} ${c.text}` : "bg-background border-border text-muted-foreground hover:text-foreground"}`}>
+                              {c.icon} {c.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Description */}
+                    <div className="col-span-2">
+                      <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Description <span className="normal-case font-normal">(optionnel)</span></p>
+                      <textarea className={`${inputCls} resize-none`} rows={2} placeholder="Détails supplémentaires..." value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <button onClick={saveEvent}
+                    disabled={!form.title || !form.date || (selectedType.usesTerrain && (!form.slot || form.courtIds.length === 0))}
+                    className="self-end flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-garden-pink text-white hover:bg-garden-pink-dark transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                    <Plus className="w-4 h-4" /> Créer l'événement
+                  </button>
+                </div>
+              )}
+
+              {/* Liste des événements */}
+              {events.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <PartyPopper className="w-10 h-10 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">Aucun événement créé. Cliquez sur "Créer un événement" pour commencer.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {events.map(ev => {
+                    const cfg = EVENT_TYPES.find(t => t.value === ev.type)!;
+                    const courts = COURTS.filter(c => ev.courtIds.includes(c.id));
+                    return (
+                      <div key={ev.id} className={`flex items-start gap-4 p-4 rounded-2xl border ${cfg.light} border-foreground/8`}>
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cfg.color}`}>{cfg.icon}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-bold text-foreground">{ev.title}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {new Date(ev.date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                                {ev.slot && ` · ${ev.slot}`}
+                              </p>
+                              {courts.length > 0 && (
+                                <div className="flex gap-1 mt-1.5 flex-wrap">
+                                  {courts.map(c => (
+                                    <span key={c.id} className={`inline-flex items-center gap-1 text-[0.65rem] font-semibold px-2 py-0.5 rounded-pill ${c.bg} ${c.text} border ${c.border}`}>
+                                      {c.icon} {c.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {ev.type === "coaching" && ev.maxPlaces && (
+                                <span className="inline-flex items-center gap-1 mt-1 text-[0.65rem] font-semibold text-garden-blue-dark bg-garden-blue-light px-2 py-0.5 rounded-pill">
+                                  {ev.maxPlaces} places
+                                </span>
+                              )}
+                              {ev.desc && <p className="text-xs text-muted-foreground mt-1">{ev.desc}</p>}
+                            </div>
+                            <button onClick={() => deleteEvent(ev.id)} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors shrink-0">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDashboard;

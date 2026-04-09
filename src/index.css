@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    --font: 'Poppins', sans-serif;
+    --font: 'Outfit', sans-serif;
     
     --blue: 200 74% 73%;
     --blue-dark: 200 62% 63%;
@@ -44,11 +44,12 @@
 }
 
 @layer base {
-  * { @apply border-border; }
+  * { border-color: hsl(var(--border)); }
   html { scroll-behavior: smooth; }
   body {
-    font-family: 'Poppins', sans-serif;
-    @apply bg-background text-foreground;
+    font-family: 'Outfit', sans-serif;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     overflow-x: hidden;
   }
   ::-webkit-scrollbar { width: 5px; }
@@ -58,10 +59,10 @@
 
 /* ============ ANIMATIONS ============ */
 @keyframes floatUp {
-  0%   { transform: translateY(100vh) rotate(0deg)  scale(0.5); opacity: 0; }
+  0%   { transform: translateY(-12vh) rotate(0deg)  scale(0.5); opacity: 0; }
   15%  { opacity: 0.4; }
   85%  { opacity: 0.4; }
-  100% { transform: translateY(-12vh) rotate(180deg) scale(1.2); opacity: 0; }
+  100% { transform: translateY(100vh) rotate(180deg) scale(1.2); opacity: 0; }
 }
 @keyframes heroZoom { from { transform: scale(1); } to { transform: scale(1.09); } }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }

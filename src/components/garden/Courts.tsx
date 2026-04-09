@@ -14,50 +14,89 @@ const tagIconMap: Record<string, ReactNode> = {
 };
 
 const courts = [
-  { icon: <Target className="w-10 h-10 text-garden-blue-dark" />, name: "Le Jardin Bleu", desc: "Vue panoramique sur les jardins. Idéal pour les matchs du matin dans la lumière naturelle.", tags: ["Vue jardin", "LED", "FFT"], thumb: "bg-gradient-to-br from-garden-blue-light to-garden-blue", tag: "Court 1", tagStyle: "" },
-  { icon: <Medal className="w-10 h-10 text-white" />, name: "La Rose des Vents", desc: "Notre court central, scène de tous les tournois. Tribunes pour une ambiance compétition unique.", tags: ["Tribunes", "HD", "Sono"], thumb: "bg-gradient-to-br from-garden-pink-light to-garden-pink", tag: "Court 2", tagStyle: "bg-garden-pink text-white" },
-  { icon: <Flower2 className="w-10 h-10 text-garden-pink-dark" />, name: "La Terrasse Rose", desc: "Le court familial et convivial. Parfait pour les cours débutants et les parties entre amis.", tags: ["Familial", "Terrasse", "Initiation"], thumb: "bg-gradient-to-br from-garden-blue-light to-garden-pink-light", tag: "Court 3", tagStyle: "" },
+  {
+    icon: <Target className="w-10 h-10" />,
+    name: "Le Jardin Bleu",
+    desc: "Vue panoramique sur les jardins. Idéal pour les matchs du matin dans la lumière naturelle.",
+    tags: ["Vue jardin", "LED", "FFT"],
+    label: "Terrain 1",
+    bg: "from-[#89c9eb]/30 to-[#6ab5db]/50",
+    iconColor: "text-garden-blue-dark",
+    large: true,
+  },
+  {
+    icon: <Medal className="w-8 h-8" />,
+    name: "La Rose des Vents",
+    desc: "Notre terrain central, scène de tous les tournois. Tribunes pour une ambiance compétition unique.",
+    tags: ["Tribunes", "HD", "Sono"],
+    label: "Terrain 2",
+    bg: "from-[#e98eaa]/30 to-[#d87594]/50",
+    iconColor: "text-garden-pink-dark",
+    large: false,
+  },
+  {
+    icon: <Flower2 className="w-8 h-8" />,
+    name: "La Terrasse Rose",
+    desc: "Le terrain familial et convivial. Parfait pour les cours débutants et les parties entre amis.",
+    tags: ["Familial", "Terrasse", "Initiation"],
+    label: "Terrain 3",
+    bg: "from-[#89c9eb]/20 to-[#e98eaa]/30",
+    iconColor: "text-garden-pink-dark",
+    large: false,
+  },
 ];
 
-const Courts = () => {
-  const scrollTo = (href: string) => {
-    const el = document.querySelector(href);
-    if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: "smooth" });
-  };
+interface Props { onBooking: () => void; }
+
+const Courts = ({ onBooking }: Props) => {
 
   return (
-    <section className="py-24 bg-background" id="courts">
+    <section className="py-28 bg-muted/30" id="courts">
       <div className="container">
-        <div>
-          <span className="inline-flex items-center gap-1.5 bg-garden-blue-light text-garden-blue-dark text-[0.72rem] font-bold tracking-[0.1em] uppercase px-4 py-1.5 rounded-pill mb-3.5"><Target className="w-3 h-3" /> Nos Terrains</span>
-          <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-extrabold leading-tight mb-3.5 text-foreground">3 Terrains de Padel<br />de Haut Standing</h2>
-          <p className="text-base text-muted-foreground leading-relaxed max-w-[540px]">Courts homologués FFT avec revêtement premium, éclairage LED et équipements professionnels.</p>
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-16">
+          <div>
+            <span className="text-[0.7rem] font-semibold tracking-[0.18em] uppercase text-garden-blue-dark mb-3 block">Nos Terrains</span>
+            <h2 className="text-4xl md:text-5xl font-black tracking-tighter leading-[1.05] text-foreground">
+              3 Terrains de Padel<br className="hidden md:block" /> de Haut Standing
+            </h2>
+          </div>
+          <p className="text-base text-muted-foreground leading-relaxed max-w-[360px] md:text-right">
+            Terrains homologués FFT, revêtement premium, éclairage LED.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-14">
+        {/* Grid 3 colonnes égales */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {courts.map((c) => (
-            <div key={c.name} className="bg-card rounded-lg overflow-hidden shadow-card transition-all duration-400 hover:-translate-y-2.5 hover:shadow-[0_24px_48px_rgba(0,0,0,0.1)] group">
-              <div className={`h-[200px] flex items-center justify-center overflow-hidden relative transition-transform duration-500 group-hover:scale-105 ${c.thumb}`}>
-                {c.icon}
-                <span className={`absolute top-3 left-3 rounded-pill px-3 py-0.5 text-[0.7rem] font-bold ${c.tagStyle || "bg-white/90 backdrop-blur-sm"}`}>{c.tag}</span>
-              </div>
-              <div className="p-5 pb-6">
-                <h3 className="text-base font-extrabold mb-1.5 text-foreground">{c.name}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-3.5">{c.desc}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {c.tags.map((t) => (
-                    <span key={t} className="inline-flex items-center gap-1 bg-background rounded-pill px-3 py-0.5 text-[0.72rem] font-semibold text-foreground">
-                      {tagIconMap[t]} {t}
-                    </span>
-                  ))}
+            <div key={c.name} className={`rounded-2xl overflow-hidden border border-border bg-gradient-to-br ${c.bg} group flex flex-col`}>
+              <div className="p-7 flex-1 flex flex-col justify-between min-h-[280px]">
+                <div className="flex items-start justify-between mb-6">
+                  <span className="text-[0.68rem] font-bold uppercase tracking-[0.15em] text-muted-foreground border border-border rounded-pill px-3 py-1 bg-background/50">{c.label}</span>
+                  <span className={c.iconColor}>{c.icon}</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-black tracking-tight text-foreground mb-2">{c.name}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed mb-4">{c.desc}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {c.tags.map((t) => (
+                      <span key={t} className="inline-flex items-center gap-1.5 bg-background/70 backdrop-blur-sm border border-border rounded-pill px-2.5 py-1 text-[0.72rem] font-medium text-foreground">
+                        {tagIconMap[t]} {t}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="text-center mt-12">
-          <a href="#adhesion" className="inline-flex items-center gap-2 px-6 py-3 rounded-pill font-bold bg-garden-blue text-white shadow-blue transition-all duration-300 hover:bg-garden-blue-dark hover:-translate-y-0.5" onClick={(e) => { e.preventDefault(); scrollTo("#adhesion"); }}>Réserver un terrain</a>
+        <div className="mt-10">
+          <button
+            onClick={onBooking}
+            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-pill font-semibold text-sm bg-garden-blue text-white shadow-blue transition-all duration-300 hover:bg-garden-blue-dark hover:-translate-y-0.5"
+          >
+            Réserver un terrain
+          </button>
         </div>
       </div>
     </section>

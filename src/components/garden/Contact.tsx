@@ -10,7 +10,7 @@ const Contact = () => (
         <p className="text-base text-muted-foreground leading-relaxed max-w-[540px]">À Six-Fours-Les-Plages, dans le Var, à deux pas de la Méditerranée.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_1.6fr] gap-14 mt-14">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.6fr] gap-14 mt-14">
         <div className="flex flex-col gap-4">
           {([
             { icon: <MapPin className="w-5 h-5" />, label: "Adresse", value: "Six-Fours-Les-Plages\nVar (83), France" },

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import Logo from "./Logo";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navLinks = [
   { href: "#accueil", label: "Accueil" },
-  { href: "#courts", label: "Courts" },
+  { href: "#courts", label: "Terrains" },
   { href: "#clubhouse", label: "Club House" },
   { href: "#tournois", label: "Tournois" },
   { href: "#evenements", label: "Événements" },
@@ -11,7 +12,10 @@ const navLinks = [
   { href: "#contact", label: "Contact" },
 ];
 
-const Navbar = () => {
+interface Props { onLogin: () => void; onRegister: () => void; onAccount: () => void; }
+
+const Navbar = ({ onLogin, onRegister, onAccount }: Props) => {
+  const { user } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState("accueil");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -48,7 +52,9 @@ const Navbar = () => {
     setMobileOpen(false);
   };
 
-  const isHero = !scrolled;
+  const isHero = activeSection === "accueil";
+  const sectionIndex = navLinks.findIndex(l => l.href.slice(1) === activeSection);
+  const logoVariant = sectionIndex % 2 === 0 ? "pink" : "blue";
 
   return (
     <>
@@ -58,7 +64,17 @@ const Navbar = () => {
         {navLinks.map((l) => (
           <a key={l.href} href={l.href} className="text-2xl font-bold text-white/85 hover:text-garden-blue transition-colors" onClick={(e) => { e.preventDefault(); scrollTo(l.href); }}>{l.label}</a>
         ))}
-        <a href="#adhesion" className="px-6 py-3 rounded-pill bg-garden-pink text-white font-bold" onClick={(e) => { e.preventDefault(); scrollTo("#adhesion"); }}>Adhésion</a>
+        {user ? (
+          <>
+            <span className="text-2xl font-bold text-white/50">Connecté</span>
+            <button onClick={() => { onAccount(); setMobileOpen(false); }} className="px-6 py-3 rounded-pill bg-garden-pink text-white font-bold">Mon compte</button>
+          </>
+        ) : (
+          <>
+            <button onClick={() => { onLogin(); setMobileOpen(false); }} className="text-2xl font-bold text-white/85 hover:text-garden-blue transition-colors">Connexion</button>
+            <button onClick={() => { onRegister(); setMobileOpen(false); }} className="px-6 py-3 rounded-pill bg-garden-pink text-white font-bold">Adhésion</button>
+          </>
+        )}
       </div>
 
       {/* Navbar */}
@@ -66,10 +82,10 @@ const Navbar = () => {
         <div className="container">
           <div className="flex items-center justify-between gap-6">
             <a href="#accueil" className="flex items-center flex-shrink-0" aria-label="Garden Padel – accueil" onClick={(e) => { e.preventDefault(); scrollTo("#accueil"); }}>
-              <Logo />
+              <Logo variant={logoVariant} />
             </a>
 
-            <ul className="hidden md:flex items-center gap-0.5">
+            <ul className="hidden lg:flex items-center gap-0.5">
               {navLinks.map((l) => (
                 <li key={l.href}>
                   <a
@@ -88,12 +104,21 @@ const Navbar = () => {
               ))}
             </ul>
 
-            <div className="hidden md:flex items-center gap-2.5">
-              <a href="mailto:contact@gardenpadel.fr" className={`px-4 py-2 rounded-pill text-sm font-bold border-2 transition-all duration-300 hover:-translate-y-0.5 ${isHero ? "text-white border-white/45 hover:bg-white/18 hover:border-white" : "text-garden-blue border-garden-blue bg-transparent hover:bg-garden-blue hover:text-white"}`}>Nous écrire</a>
-              <a href="#adhesion" className="px-4 py-2 rounded-pill text-sm font-bold bg-garden-pink text-white shadow-pink transition-all duration-300 hover:bg-garden-pink-dark hover:-translate-y-0.5" onClick={(e) => { e.preventDefault(); scrollTo("#adhesion"); }}>Adhésion</a>
+            <div className="hidden lg:flex items-center gap-2.5">
+              {user ? (
+                <>
+                  <span className={`px-4 py-2 text-sm font-bold ${isHero ? "text-white/50" : "text-muted-foreground"}`}>Connecté</span>
+                  <button onClick={onAccount} className="px-4 py-2 rounded-pill text-sm font-bold bg-garden-pink text-white shadow-pink transition-all duration-300 hover:bg-garden-pink-dark hover:-translate-y-0.5">Mon compte</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={onLogin} className={`px-4 py-2 rounded-pill text-sm font-bold border-2 transition-all duration-300 hover:-translate-y-0.5 ${isHero ? "text-white border-white/45 hover:bg-white/18 hover:border-white" : "text-garden-blue border-garden-blue bg-transparent hover:bg-garden-blue hover:text-white"}`}>Connexion</button>
+                  <button onClick={onRegister} className="px-4 py-2 rounded-pill text-sm font-bold bg-garden-pink text-white shadow-pink transition-all duration-300 hover:bg-garden-pink-dark hover:-translate-y-0.5">Adhésion</button>
+                </>
+              )}
             </div>
 
-            <button className="flex md:hidden flex-col gap-[5px] cursor-pointer bg-transparent border-none p-1" onClick={() => setMobileOpen(true)} aria-label="Menu">
+            <button className="flex lg:hidden flex-col gap-[5px] cursor-pointer bg-transparent border-none p-1" onClick={() => setMobileOpen(true)} aria-label="Menu">
               <span className={`w-6 h-0.5 rounded-sm transition-all ${isHero ? "bg-white" : "bg-foreground"}`} />
               <span className={`w-6 h-0.5 rounded-sm transition-all ${isHero ? "bg-white" : "bg-foreground"}`} />
               <span className={`w-6 h-0.5 rounded-sm transition-all ${isHero ? "bg-white" : "bg-foreground"}`} />

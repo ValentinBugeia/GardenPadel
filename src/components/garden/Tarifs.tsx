@@ -18,12 +18,12 @@ const Tarifs = () => (
   <section className="py-24" id="tarifs">
     <div className="container">
       <div>
-        <span className="inline-flex items-center gap-1.5 bg-garden-blue-light text-garden-blue-dark text-[0.72rem] font-bold tracking-[0.1em] uppercase px-4 py-1.5 rounded-pill mb-3.5"><ClipboardList className="w-3 h-3" /> Pratique</span>
-        <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-extrabold leading-tight mb-3.5 text-foreground">Horaires &amp; Tarifs</h2>
-        <p className="text-base text-muted-foreground leading-relaxed max-w-[540px]">Des tarifs transparents pour profiter du club à tout moment.</p>
+        <span className="text-[0.7rem] font-semibold tracking-[0.18em] uppercase text-garden-blue-dark mb-3 block">Pratique</span>
+        <h2 className="text-4xl md:text-5xl font-black tracking-tighter leading-[1.05] text-foreground mb-4">Horaires &amp; Tarifs</h2>
+        <p className="text-base text-muted-foreground leading-relaxed max-w-[480px]">Des tarifs transparents pour profiter du club à tout moment.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-14 mt-14 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 mt-14 items-start">
         <div>
           <h3 className="inline-flex items-center gap-2 text-base font-bold mb-4 text-foreground"><Clock className="w-4 h-4" /> Horaires d'ouverture</h3>
           <table className="w-full border-collapse rounded-lg overflow-hidden">

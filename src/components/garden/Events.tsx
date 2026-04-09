@@ -4,9 +4,9 @@ const Events = () => (
   <section className="py-24" id="evenements">
     <div className="container">
       <div>
-        <span className="inline-flex items-center gap-1.5 bg-garden-pink-light text-garden-pink-dark text-[0.72rem] font-bold tracking-[0.1em] uppercase px-4 py-1.5 rounded-pill mb-3.5"><Sparkles className="w-3 h-3" /> Événements</span>
-        <h2 className="text-[clamp(1.9rem,4vw,2.75rem)] font-extrabold leading-tight mb-3.5 text-foreground">Afterwork &amp; Séminaires<br />autour du padel</h2>
-        <p className="text-base text-muted-foreground leading-relaxed max-w-[540px]">Vivez des expériences uniques : soirées afterwork entre collègues ou séminaires team-building sur les courts.</p>
+        <span className="text-[0.7rem] font-semibold tracking-[0.18em] uppercase text-garden-pink-dark mb-3 block">Événements</span>
+        <h2 className="text-4xl md:text-5xl font-black tracking-tighter leading-[1.05] text-foreground mb-4">Afterwork &amp; Séminaires<br />autour du padel</h2>
+        <p className="text-base text-muted-foreground leading-relaxed max-w-[480px]">Soirées afterwork entre collègues ou séminaires team-building sur les terrains.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-14">

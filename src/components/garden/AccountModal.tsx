@@ -198,7 +198,7 @@ const AccountModal = ({ open, onClose, onAdmin, onMemberPanel }: Props) => {
           {/* Crédits */}
           <div className="pt-3 border-t border-border">
             <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-2.5 text-center">Crédits restants</p>
-            {permissions.includes("book_free") ? (
+            {(permissions.includes("book_free") || user.role === "admin") ? (
               <div className="flex flex-col items-center gap-0.5">
                 <span className="text-4xl font-black text-garden-blue leading-none">∞</span>
                 <p className="text-center text-[0.7rem] text-muted-foreground mt-1">Réservation sans crédits</p>

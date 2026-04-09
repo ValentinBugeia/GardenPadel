@@ -90,7 +90,7 @@ const getWeekDays = (startOffset: number) => {
 const inputCls = "w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all";
 
 const AdminDashboard = ({ open, onClose }: Props) => {
-  const { users, logout } = useAuth();
+  const { user: currentUser, users, logout } = useAuth();
   const [search, setSearch]     = useState("");
   const [tab, setTab]           = useState<"members"|"reservations"|"events"|"badges">("members");
   const [weekOffset, setWeekOffset] = useState(0);
@@ -124,7 +124,8 @@ const AdminDashboard = ({ open, onClose }: Props) => {
   const reservations: Reservation[] = JSON.parse(localStorage.getItem(STORAGE_RESERVATIONS) || "[]");
   const days = getWeekDays(weekOffset * 7);
 
-  const filteredUsers = users.filter(u =>
+  const allMembers = currentUser?.role === "admin" ? [currentUser, ...users] : users;
+  const filteredUsers = allMembers.filter(u =>
     `${u.firstName} ${u.lastName} ${u.email} ${u.level}`.toLowerCase().includes(search.toLowerCase())
   );
   const getResForDayAndCourt = (date: string, courtId: number) =>
@@ -307,7 +308,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                       <td className="px-5 py-3.5"><span className={`inline-block px-2.5 py-0.5 rounded-pill text-[0.7rem] font-bold ${LEVEL_COLORS[u.level] || "bg-muted text-muted-foreground"}`}>{u.level}</span></td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1.5">
-                          {bookFreeIds.has(u.id) ? (
+                          {(u.role === "admin" || bookFreeIds.has(u.id)) ? (
                             <span className="text-lg font-black text-garden-blue leading-none">∞</span>
                           ) : (
                             <>

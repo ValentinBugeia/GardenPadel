@@ -6,6 +6,8 @@ import flowerBlue from "@/assets/flower-blue.png";
 const STORAGE_RESERVATIONS = "gp_reservations";
 const STORAGE_USERS = "gp_users";
 const STORAGE_EVENTS = "gp_admin_events";
+const STORAGE_BADGES = "gp_badges";
+const STORAGE_USER_BADGES = "gp_user_badges";
 
 const terrains = [
   { id: 1, name: "Le Jardin Bleu",    desc: "Vue jardin · LED · FFT",         bg: "from-[#89c9eb]/30 to-[#6ab5db]/50", border: "border-garden-blue", icon: <Target  className="w-6 h-6 text-garden-blue-dark" /> },
@@ -85,16 +87,27 @@ const BookingModal = ({ open, onClose }: Props) => {
     [selectedDay, selectedSlot, availableTerrains.length]
   );
 
-  // Utilisateurs éligibles : crédits > 0, pas déjà sélectionné, pas soi-même
+  // IDs des utilisateurs ayant la permission "book_free"
+  const bookFreeIds = useMemo(() => {
+    const ub: Record<string, string[]> = JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}");
+    const ab: { id: string; permissions: string[] }[] = JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]");
+    return new Set(
+      Object.entries(ub)
+        .filter(([, ids]) => ids.some(bid => ab.find(b => b.id === bid)?.permissions.includes("book_free")))
+        .map(([userId]) => userId)
+    );
+  }, [open]);
+
+  // Utilisateurs éligibles : crédits > 0 OU book_free, pas déjà sélectionné, pas soi-même
   const eligible = useMemo(() => {
     const q = search.toLowerCase();
     return users.filter(u =>
       u.id !== user?.id &&
-      (u.credits ?? 0) > 0 &&
+      ((u.credits ?? 0) > 0 || bookFreeIds.has(u.id)) &&
       !players.find(p => p.id === u.id) &&
       (`${u.firstName} ${u.lastName}`.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
     );
-  }, [users, user, players, search]);
+  }, [users, user, players, search, bookFreeIds]);
 
   const addPlayer  = (u: User) => { if (players.length < 3) { setPlayers([...players, u]); setSearch(""); setShowDropdown(false); } };
   const removePlayer = (id: string) => setPlayers(players.filter(p => p.id !== id));
@@ -285,8 +298,14 @@ const BookingModal = ({ open, onClose }: Props) => {
                     <p className="text-xs text-muted-foreground">{user?.email}</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <img src={flowerBlue} alt="crédit" className="h-4 w-auto" />
-                    <span className="text-xs font-semibold text-garden-blue-dark">{user?.credits ?? 0}</span>
+                    {user && bookFreeIds.has(user.id) ? (
+                      <span className="text-base font-black text-garden-blue leading-none">∞</span>
+                    ) : (
+                      <>
+                        <img src={flowerBlue} alt="crédit" className="h-4 w-auto" />
+                        <span className="text-xs font-semibold text-garden-blue-dark">{user?.credits ?? 0}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -307,8 +326,14 @@ const BookingModal = ({ open, onClose }: Props) => {
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1">
-                            <img src={flowerBlue} alt="crédit" className="h-4 w-auto" />
-                            <span className="text-xs font-semibold text-garden-blue-dark">{p.credits ?? 0}</span>
+                            {bookFreeIds.has(p.id) ? (
+                              <span className="text-base font-black text-garden-blue leading-none">∞</span>
+                            ) : (
+                              <>
+                                <img src={flowerBlue} alt="crédit" className="h-4 w-auto" />
+                                <span className="text-xs font-semibold text-garden-blue-dark">{p.credits ?? 0}</span>
+                              </>
+                            )}
                           </div>
                           <button onClick={() => removePlayer(p.id)} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-red-500">
                             <XCircle className="w-4 h-4" />
@@ -359,8 +384,14 @@ const BookingModal = ({ open, onClose }: Props) => {
                                 <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
-                                <img src={flowerBlue} alt="crédit" className="h-3.5 w-auto" />
-                                <span className="text-xs font-semibold text-garden-blue-dark">{u.credits}</span>
+                                {bookFreeIds.has(u.id) ? (
+                                  <span className="text-base font-black text-garden-blue leading-none">∞</span>
+                                ) : (
+                                  <>
+                                    <img src={flowerBlue} alt="crédit" className="h-3.5 w-auto" />
+                                    <span className="text-xs font-semibold text-garden-blue-dark">{u.credits}</span>
+                                  </>
+                                )}
                               </div>
                             </button>
                           ))

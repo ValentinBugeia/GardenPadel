@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil } from "lucide-react";
 import flowerBlue from "@/assets/flower-blue.png";
 import { useAuth, type User } from "@/contexts/AuthContext";
@@ -90,7 +90,7 @@ const getWeekDays = (startOffset: number) => {
 const inputCls = "w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all";
 
 const AdminDashboard = ({ open, onClose }: Props) => {
-  const { users, logout } = useAuth();
+  const { user: currentUser, users, logout } = useAuth();
   const [search, setSearch]     = useState("");
   const [tab, setTab]           = useState<"members"|"reservations"|"events"|"badges">("members");
   const [weekOffset, setWeekOffset] = useState(0);
@@ -114,10 +114,18 @@ const AdminDashboard = ({ open, onClose }: Props) => {
     }
   }, [open, tab]);
 
+  // IDs des membres ayant la permission "book_free"
+  const bookFreeIds = useMemo(() => new Set(
+    Object.entries(userBadges)
+      .filter(([, ids]) => ids.some(bid => badges.find(b => b.id === bid)?.permissions.includes("book_free")))
+      .map(([userId]) => userId)
+  ), [badges, userBadges]);
+
   const reservations: Reservation[] = JSON.parse(localStorage.getItem(STORAGE_RESERVATIONS) || "[]");
   const days = getWeekDays(weekOffset * 7);
 
-  const filteredUsers = users.filter(u =>
+  const allMembers = currentUser?.role === "admin" ? [currentUser, ...users] : users;
+  const filteredUsers = allMembers.filter(u =>
     `${u.firstName} ${u.lastName} ${u.email} ${u.level}`.toLowerCase().includes(search.toLowerCase())
   );
   const getResForDayAndCourt = (date: string, courtId: number) =>
@@ -299,7 +307,16 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                       <td className="px-5 py-3.5 text-muted-foreground max-w-[140px] truncate">{u.address}</td>
                       <td className="px-5 py-3.5"><span className={`inline-block px-2.5 py-0.5 rounded-pill text-[0.7rem] font-bold ${LEVEL_COLORS[u.level] || "bg-muted text-muted-foreground"}`}>{u.level}</span></td>
                       <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-1.5"><img src={flowerBlue} alt="crédit" className="h-4 w-auto" /><span className="text-sm font-bold text-garden-blue-dark">{u.credits ?? 0}</span></div>
+                        <div className="flex items-center gap-1.5">
+                          {(u.role === "admin" || bookFreeIds.has(u.id)) ? (
+                            <span className="text-lg font-black text-garden-blue leading-none">∞</span>
+                          ) : (
+                            <>
+                              <img src={flowerBlue} alt="crédit" className="h-4 w-auto" />
+                              <span className="text-sm font-bold text-garden-blue-dark">{u.credits ?? 0}</span>
+                            </>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-3.5 text-muted-foreground text-xs">{new Date(u.createdAt).toLocaleDateString("fr-FR")}</td>
                     </tr>

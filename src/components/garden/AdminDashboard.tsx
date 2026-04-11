@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil } from "lucide-react";
 import flowerBlue from "@/assets/flower-blue.png";
 import { useAuth, type User } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 interface Props { open: boolean; onClose: () => void; }
 
@@ -23,10 +24,40 @@ export interface AdminEvent {
   createdAt: string;
 }
 
-const STORAGE_RESERVATIONS = "gp_reservations";
-export const STORAGE_EVENTS    = "gp_admin_events";
-export const STORAGE_BADGES    = "gp_badges";
-export const STORAGE_USER_BADGES = "gp_user_badges";
+// DB → local type converters
+const toAdminEvent = (row: Record<string, unknown>): AdminEvent => ({
+  id:        row.id as string,
+  type:      row.type as AdminEvent["type"],
+  title:     row.title as string,
+  date:      row.date as string,
+  slot:      (row.slot as string) || "",
+  courtIds:  (row.court_ids as number[]) || [],
+  maxPlaces: row.max_places as number | undefined,
+  desc:      (row.description as string) || "",
+  createdAt: (row.created_at as string) || new Date().toISOString(),
+});
+
+const toBadge = (row: Record<string, unknown>): Badge => ({
+  id:          row.id as string,
+  name:        row.name as string,
+  emoji:       (row.emoji as string) || "",
+  color:       (row.color as string) || "#6ab5db",
+  permissions: (row.permissions as string[]) || [],
+  createdAt:   (row.created_at as string) || new Date().toISOString(),
+});
+
+const toReservation = (row: Record<string, unknown>): Reservation => ({
+  id:            row.id as string,
+  courtId:       row.court_id as number,
+  courtName:     (row.court_name as string) || "",
+  date:          row.date as string,
+  slot:          row.slot as string,
+  userId:        (row.user_id as string) || "",
+  userFirstName: (row.user_first_name as string) || "",
+  userLastName:  (row.user_last_name as string) || "",
+  userEmail:     (row.user_email as string) || "",
+  createdAt:     (row.created_at as string) || new Date().toISOString(),
+});
 
 export interface Badge {
   id: string;
@@ -96,22 +127,40 @@ const AdminDashboard = ({ open, onClose }: Props) => {
   const [weekOffset, setWeekOffset] = useState(0);
 
   // Events state
-  const [events, setEvents]         = useState<AdminEvent[]>(() => JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]"));
+  const [events, setEvents]         = useState<AdminEvent[]>([]);
   const [showForm, setShowForm]     = useState(false);
   const [form, setForm]             = useState({ type: "seminaire" as AdminEvent["type"], title: "", date: "", slot: "", courtIds: [] as number[], maxPlaces: 8, desc: "" });
 
   // Badges state
-  const [badges, setBadges]             = useState<Badge[]>(() => JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]"));
-  const [userBadges, setUserBadges]     = useState<Record<string, string[]>>(() => JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}"));
+  const [badges, setBadges]         = useState<Badge[]>([]);
+  const [userBadges, setUserBadges] = useState<Record<string, string[]>>({});
   const [badgeEditState, setBadgeEditState] = useState<{ id?: string; name: string; emoji: string; color: string; permissions: string[] } | null>(null);
 
-  // Rechargement localStorage à chaque ouverture / changement d'onglet
+  // Reservations state
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+
+  // Chargement Supabase à chaque ouverture / changement d'onglet
   useEffect(() => {
-    if (open) {
-      setEvents(JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]"));
-      setBadges(JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]"));
-      setUserBadges(JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}"));
-    }
+    if (!open) return;
+    const load = async () => {
+      const [evRes, bdRes, ubRes, rsRes] = await Promise.all([
+        supabase.from("events").select("*").order("date"),
+        supabase.from("badges").select("*").order("created_at"),
+        supabase.from("user_badges").select("*"),
+        supabase.from("reservations").select("*").order("date"),
+      ]);
+      if (evRes.data) setEvents(evRes.data.map(r => toAdminEvent(r as Record<string, unknown>)));
+      if (bdRes.data) setBadges(bdRes.data.map(r => toBadge(r as Record<string, unknown>)));
+      if (ubRes.data) {
+        const ub: Record<string, string[]> = {};
+        for (const row of ubRes.data as { user_id: string; badge_id: string }[]) {
+          ub[row.user_id] = ub[row.user_id] ? [...ub[row.user_id], row.badge_id] : [row.badge_id];
+        }
+        setUserBadges(ub);
+      }
+      if (rsRes.data) setReservations(rsRes.data.map(r => toReservation(r as Record<string, unknown>)));
+    };
+    load();
   }, [open, tab]);
 
   // IDs des membres ayant la permission "book_free"
@@ -121,7 +170,6 @@ const AdminDashboard = ({ open, onClose }: Props) => {
       .map(([userId]) => userId)
   ), [badges, userBadges]);
 
-  const reservations: Reservation[] = JSON.parse(localStorage.getItem(STORAGE_RESERVATIONS) || "[]");
   const days = getWeekDays(weekOffset * 7);
 
   const allMembers = currentUser?.role === "admin" ? [currentUser, ...users] : users;
@@ -138,60 +186,63 @@ const AdminDashboard = ({ open, onClose }: Props) => {
   const toggleCourt = (id: number) =>
     setForm(f => ({ ...f, courtIds: f.courtIds.includes(id) ? f.courtIds.filter(c => c !== id) : [...f.courtIds, id] }));
 
-  const saveEvent = () => {
+  const saveEvent = async () => {
     if (!form.title || !form.date) return;
     if (selectedType.usesTerrain && (!form.slot || form.courtIds.length === 0)) return;
-    const ev: AdminEvent = {
-      id: `ev-${Date.now()}`, type: form.type, title: form.title, date: form.date,
-      slot: form.slot, courtIds: form.courtIds, desc: form.desc,
-      ...(form.type === "coaching" ? { maxPlaces: form.maxPlaces } : {}),
-      createdAt: new Date().toISOString(),
+    const newRow = {
+      id: `ev-${Date.now()}`,
+      type: form.type, title: form.title, date: form.date,
+      slot: form.slot, court_ids: form.courtIds,
+      max_places: form.type === "coaching" ? form.maxPlaces : null,
+      description: form.desc,
     };
-    const updated = [...events, ev].sort((a, b) => a.date.localeCompare(b.date));
-    localStorage.setItem(STORAGE_EVENTS, JSON.stringify(updated));
-    setEvents(updated);
-    setForm({ type: "seminaire", title: "", date: "", slot: "", courtIds: [], desc: "" });
+    const { data, error } = await supabase.from("events").insert(newRow).select().single();
+    if (!error && data) {
+      const ev = toAdminEvent(data as Record<string, unknown>);
+      setEvents(prev => [...prev, ev].sort((a, b) => a.date.localeCompare(b.date)));
+    }
+    setForm({ type: "seminaire", title: "", date: "", slot: "", courtIds: [], maxPlaces: 8, desc: "" });
     setShowForm(false);
   };
 
-  const deleteEvent = (id: string) => {
-    const updated = events.filter(e => e.id !== id);
-    localStorage.setItem(STORAGE_EVENTS, JSON.stringify(updated));
-    setEvents(updated);
+  const deleteEvent = async (id: string) => {
+    await supabase.from("events").delete().eq("id", id);
+    setEvents(prev => prev.filter(e => e.id !== id));
   };
 
   // ── Badge CRUD ──────────────────────────────────────────────────────────
-  const saveBadge = () => {
+  const saveBadge = async () => {
     if (!badgeEditState || !badgeEditState.name.trim()) return;
-    let updated: Badge[];
-    if (badgeEditState.id) {
-      updated = badges.map(b => b.id === badgeEditState.id ? { ...b, ...badgeEditState } as Badge : b);
-    } else {
-      const newBadge: Badge = { id: `badge-${Date.now()}`, name: badgeEditState.name, emoji: badgeEditState.emoji, color: badgeEditState.color, permissions: badgeEditState.permissions, createdAt: new Date().toISOString() };
-      updated = [...badges, newBadge];
+    const row = {
+      id: badgeEditState.id || `badge-${Date.now()}`,
+      name: badgeEditState.name, emoji: badgeEditState.emoji,
+      color: badgeEditState.color, permissions: badgeEditState.permissions,
+    };
+    const { data, error } = await supabase.from("badges").upsert(row).select().single();
+    if (!error && data) {
+      const badge = toBadge(data as Record<string, unknown>);
+      setBadges(prev => badgeEditState.id ? prev.map(b => b.id === badge.id ? badge : b) : [...prev, badge]);
     }
-    localStorage.setItem(STORAGE_BADGES, JSON.stringify(updated));
-    setBadges(updated);
     setBadgeEditState(null);
   };
 
-  const deleteBadge = (id: string) => {
-    const updated = badges.filter(b => b.id !== id);
-    localStorage.setItem(STORAGE_BADGES, JSON.stringify(updated));
-    setBadges(updated);
-    // Retirer ce badge de tous les membres
-    const ub = Object.fromEntries(Object.entries(userBadges).map(([uid, bids]) => [uid, bids.filter(bid => bid !== id)]));
-    localStorage.setItem(STORAGE_USER_BADGES, JSON.stringify(ub));
-    setUserBadges(ub);
+  const deleteBadge = async (id: string) => {
+    await supabase.from("badges").delete().eq("id", id);
+    setBadges(prev => prev.filter(b => b.id !== id));
+    setUserBadges(prev => Object.fromEntries(
+      Object.entries(prev).map(([uid, bids]) => [uid, bids.filter(bid => bid !== id)])
+    ));
   };
 
-  const toggleUserBadge = (userId: string, badgeId: string) => {
+  const toggleUserBadge = async (userId: string, badgeId: string) => {
     const current = userBadges[userId] || [];
-    const updated = current.includes(badgeId)
-      ? { ...userBadges, [userId]: current.filter(id => id !== badgeId) }
-      : { ...userBadges, [userId]: [...current, badgeId] };
-    localStorage.setItem(STORAGE_USER_BADGES, JSON.stringify(updated));
-    setUserBadges(updated);
+    if (current.includes(badgeId)) {
+      await supabase.from("user_badges").delete().eq("user_id", userId).eq("badge_id", badgeId);
+      setUserBadges(prev => ({ ...prev, [userId]: current.filter(id => id !== badgeId) }));
+    } else {
+      await supabase.from("user_badges").insert({ user_id: userId, badge_id: badgeId });
+      setUserBadges(prev => ({ ...prev, [userId]: [...current, badgeId] }));
+    }
   };
 
   const subLabel = () => {

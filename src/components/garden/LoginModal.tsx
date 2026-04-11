@@ -11,10 +11,11 @@ interface Props {
 
 const LoginModal = ({ open, onClose, onSwitchToRegister, onAdminOpen }: Props) => {
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail]             = useState("");
+  const [password, setPassword]       = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError]             = useState("");
+  const [loading, setLoading]         = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -29,12 +30,13 @@ const LoginModal = ({ open, onClose, onSwitchToRegister, onAdminOpen }: Props) =
 
   if (!open) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const result = login(email, password);
+    setLoading(true);
+    const result = await login(email, password);
+    setLoading(false);
     if (result.success) {
-      // Si admin, ouvrir le dashboard
       if (email === "admin@gardenpadel.fr") {
         onClose();
         onAdminOpen();
@@ -81,7 +83,6 @@ const LoginModal = ({ open, onClose, onSwitchToRegister, onAdminOpen }: Props) =
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Mot de passe</label>
-                <a href="#" className="text-xs text-garden-blue-dark hover:underline">Mot de passe oublié ?</a>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -100,8 +101,8 @@ const LoginModal = ({ open, onClose, onSwitchToRegister, onAdminOpen }: Props) =
               <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>
             )}
 
-            <button type="submit" className="w-full py-3.5 rounded-2xl font-bold text-sm bg-garden-blue text-white shadow-blue transition-all duration-300 hover:bg-garden-blue-dark hover:-translate-y-0.5 mt-2">
-              Se connecter
+            <button type="submit" disabled={loading} className="w-full py-3.5 rounded-2xl font-bold text-sm bg-garden-blue text-white shadow-blue transition-all duration-300 hover:bg-garden-blue-dark hover:-translate-y-0.5 mt-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0">
+              {loading ? "Connexion…" : "Se connecter"}
             </button>
           </form>
 

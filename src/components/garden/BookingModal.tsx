@@ -3,11 +3,7 @@ import { X, ChevronLeft, ChevronRight, Target, Medal, Flower2, CheckCircle2, Clo
 import { useAuth, type User } from "@/contexts/AuthContext";
 import flowerBlue from "@/assets/flower-blue.png";
 
-const STORAGE_RESERVATIONS = "gp_reservations";
-const STORAGE_USERS = "gp_users";
-const STORAGE_EVENTS = "gp_admin_events";
-const STORAGE_BADGES = "gp_badges";
-const STORAGE_USER_BADGES = "gp_user_badges";
+import { supabase } from "@/lib/supabase";
 
 const terrains = [
   { id: 1, name: "Le Jardin Bleu",    desc: "Vue jardin · LED · FFT",         bg: "from-[#89c9eb]/30 to-[#6ab5db]/50", border: "border-garden-blue", icon: <Target  className="w-6 h-6 text-garden-blue-dark" /> },
@@ -32,23 +28,6 @@ const getNextDays = () => {
   return days;
 };
 
-const getAvailableTerrains = (day: string, slot: string) => {
-  const reservations = JSON.parse(localStorage.getItem(STORAGE_RESERVATIONS) || "[]");
-  const events       = JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]");
-  const takenByRes   = reservations.filter((r: { date: string; slot: string; courtId: number }) => r.date === day && r.slot === slot).map((r: { courtId: number }) => r.courtId);
-  const takenByEvs   = events.filter((e: { date: string; slot: string; courtIds: number[] }) => e.date === day && e.slot === slot).flatMap((e: { courtIds: number[] }) => e.courtIds);
-  const taken        = [...new Set([...takenByRes, ...takenByEvs])];
-  return terrains.filter(t => !taken.includes(t.id));
-};
-
-const getNearestAvailableSlot = (day: string, currentSlot: string): string | null => {
-  const idx = slots.indexOf(currentSlot);
-  const candidates = slots
-    .map((s, i) => ({ s, dist: Math.abs(i - idx) }))
-    .filter(({ s }) => s !== currentSlot && getAvailableTerrains(day, s).length > 0)
-    .sort((a, b) => a.dist - b.dist);
-  return candidates.length > 0 ? candidates[0].s : null;
-};
 
 interface Props { open: boolean; onClose: () => void; }
 
@@ -78,24 +57,64 @@ const BookingModal = ({ open, onClose }: Props) => {
   const reset = () => { setStep(1); setSelectedSlot(null); setSelectedTerrain(null); setPlayers([]); setSearch(""); };
   const handleClose = () => { onClose(); setTimeout(reset, 300); };
 
-  const availableTerrains = useMemo(
-    () => (selectedDay && selectedSlot ? getAvailableTerrains(selectedDay, selectedSlot) : []),
-    [selectedDay, selectedSlot]
-  );
-  const nearestSlot = useMemo(
-    () => (selectedDay && selectedSlot && availableTerrains.length === 0 ? getNearestAvailableSlot(selectedDay, selectedSlot) : null),
-    [selectedDay, selectedSlot, availableTerrains.length]
-  );
+  // Disponibilité des terrains (chargée depuis Supabase quand le jour change)
+  const [dayTaken, setDayTaken] = useState<Map<string, number[]>>(new Map());
+  useEffect(() => {
+    if (!selectedDay) { setDayTaken(new Map()); return; }
+    const fetch = async () => {
+      const [resData, evData] = await Promise.all([
+        supabase.from("reservations").select("slot, court_id").eq("date", selectedDay),
+        supabase.from("events").select("slot, court_ids").eq("date", selectedDay),
+      ]);
+      const map = new Map<string, number[]>();
+      for (const r of (resData.data || []) as { slot: string; court_id: number }[]) {
+        map.set(r.slot, [...(map.get(r.slot) || []), r.court_id]);
+      }
+      for (const e of (evData.data || []) as { slot: string; court_ids: number[] }[]) {
+        if (e.slot) map.set(e.slot, [...(map.get(e.slot) || []), ...(e.court_ids || [])]);
+      }
+      setDayTaken(map);
+    };
+    fetch();
+  }, [selectedDay]);
+
+  const availableTerrains = useMemo(() => {
+    if (!selectedDay || !selectedSlot) return [];
+    const taken = dayTaken.get(selectedSlot) || [];
+    return terrains.filter(t => !taken.includes(t.id));
+  }, [selectedDay, selectedSlot, dayTaken]);
+
+  const nearestSlot = useMemo(() => {
+    if (!selectedDay || !selectedSlot || availableTerrains.length > 0) return null;
+    const idx = slots.indexOf(selectedSlot);
+    const candidates = slots
+      .map((s, i) => ({ s, dist: Math.abs(i - idx) }))
+      .filter(({ s }) => {
+        if (s === selectedSlot) return false;
+        const taken = dayTaken.get(s) || [];
+        return terrains.some(t => !taken.includes(t.id));
+      })
+      .sort((a, b) => a.dist - b.dist);
+    return candidates.length > 0 ? candidates[0].s : null;
+  }, [selectedDay, selectedSlot, availableTerrains.length, dayTaken]);
 
   // IDs des utilisateurs ayant la permission "book_free"
-  const bookFreeIds = useMemo(() => {
-    const ub: Record<string, string[]> = JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}");
-    const ab: { id: string; permissions: string[] }[] = JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]");
-    return new Set(
-      Object.entries(ub)
-        .filter(([, ids]) => ids.some(bid => ab.find(b => b.id === bid)?.permissions.includes("book_free")))
-        .map(([userId]) => userId)
-    );
+  const [bookFreeIds, setBookFreeIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!open) return;
+    const fetch = async () => {
+      const [ubData, bdData] = await Promise.all([
+        supabase.from("user_badges").select("user_id, badge_id"),
+        supabase.from("badges").select("id, permissions"),
+      ]);
+      if (ubData.data && bdData.data) {
+        const freeIds = new Set((bdData.data as { id: string; permissions: string[] }[])
+          .filter(b => b.permissions.includes("book_free")).map(b => b.id));
+        setBookFreeIds(new Set((ubData.data as { user_id: string; badge_id: string }[])
+          .filter(ub => freeIds.has(ub.badge_id)).map(ub => ub.user_id)));
+      }
+    };
+    fetch();
   }, [open]);
 
   // Utilisateurs éligibles : crédits > 0 OU book_free, pas déjà sélectionné, pas soi-même
@@ -112,35 +131,31 @@ const BookingModal = ({ open, onClose }: Props) => {
   const addPlayer  = (u: User) => { if (players.length < 3) { setPlayers([...players, u]); setSearch(""); setShowDropdown(false); } };
   const removePlayer = (id: string) => setPlayers(players.filter(p => p.id !== id));
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     const terrain = terrains.find(t => t.id === selectedTerrain);
     const allPlayers = [user!, ...players];
 
-    // Déduire 1 crédit à chaque joueur
-    const storedUsers: User[] = JSON.parse(localStorage.getItem(STORAGE_USERS) || "[]");
-    const updatedUsers = storedUsers.map(u =>
-      allPlayers.find(p => p.id === u.id) ? { ...u, credits: Math.max(0, (u.credits ?? 0) - 1) } : u
-    );
-    localStorage.setItem(STORAGE_USERS, JSON.stringify(updatedUsers));
-    // Mettre à jour le state du user courant
-    if ((user?.credits ?? 0) > 0) updateUser({ credits: Math.max(0, (user?.credits ?? 0) - 1) } as Parameters<typeof updateUser>[0]);
+    // Déduire 1 crédit via RPC (SECURITY DEFINER) pour chaque joueur sans book_free
+    const creditPlayers = allPlayers.filter(p => p.role !== "admin" && !bookFreeIds.has(p.id) && (p.credits ?? 0) > 0);
+    await Promise.all(creditPlayers.map(p => supabase.rpc("deduct_credit", { player_id: p.id })));
+    // Mettre à jour le state local du user courant
+    if (user && user.role !== "admin" && !bookFreeIds.has(user.id) && (user.credits ?? 0) > 0) {
+      await updateUser({ credits: Math.max(0, (user.credits ?? 0) - 1) });
+    }
 
-    // Enregistrer la réservation
-    const reservation = {
+    // Enregistrer la réservation dans Supabase
+    await supabase.from("reservations").insert({
       id: `res-${Date.now()}`,
-      courtId: selectedTerrain,
-      courtName: terrain?.name,
+      court_id: selectedTerrain,
+      court_name: terrain?.name,
       date: selectedDay,
       slot: selectedSlot,
-      userId: user?.id || "guest",
-      userFirstName: user?.firstName || "Invité",
-      userLastName:  user?.lastName  || "",
-      userEmail:     user?.email     || "—",
+      user_id: user?.id,
+      user_first_name: user?.firstName || "Invité",
+      user_last_name:  user?.lastName  || "",
+      user_email:      user?.email     || "—",
       players: allPlayers.map(p => ({ id: p.id, firstName: p.firstName, lastName: p.lastName })),
-      createdAt: new Date().toISOString(),
-    };
-    const existing = JSON.parse(localStorage.getItem(STORAGE_RESERVATIONS) || "[]");
-    localStorage.setItem(STORAGE_RESERVATIONS, JSON.stringify([...existing, reservation]));
+    });
     setStep(4);
     setTimeout(handleClose, 2500);
   };

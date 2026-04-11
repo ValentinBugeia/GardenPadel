@@ -2,9 +2,7 @@ import { useState, useEffect } from "react";
 import { X, LogOut, Mail, MapPin, Calendar, Trophy, ShieldCheck, Settings, Pencil, Check, AlertCircle, LayoutDashboard } from "lucide-react";
 import { useAuth, type PadelLevel } from "@/contexts/AuthContext";
 import flowerBlue from "@/assets/flower-blue.png";
-
-const STORAGE_BADGES      = "gp_badges";
-const STORAGE_USER_BADGES = "gp_user_badges";
+import { supabase } from "@/lib/supabase";
 const MEMBER_PANEL_PERMS  = ["view_planning", "manage_coaching", "manage_soirees"];
 
 const LEVEL_COLORS: Record<string, string> = {
@@ -37,13 +35,22 @@ const AccountModal = ({ open, onClose, onAdmin, onMemberPanel }: Props) => {
   const [permissions, setPermissions] = useState<string[]>([]);
 
   useEffect(() => {
-    if (open && user) {
-      const ub: Record<string, string[]> = JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}");
-      const ab: { id: string; name: string; emoji: string; color: string; permissions: string[] }[] = JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]");
-      const ids = ub[user.id] || [];
-      setMyBadges(ids.map(id => ab.find(b => b.id === id)).filter(Boolean) as typeof myBadges);
-      setPermissions([...new Set(ids.flatMap(bid => ab.find(b => b.id === bid)?.permissions ?? []))]);
-    }
+    if (!open || !user) return;
+    const load = async () => {
+      const { data: ubData } = await supabase.from("user_badges").select("badge_id").eq("user_id", user.id);
+      const badgeIds = (ubData || []).map(r => (r as { badge_id: string }).badge_id);
+      if (badgeIds.length > 0) {
+        const { data: bdData } = await supabase.from("badges").select("id, name, emoji, color, permissions").in("id", badgeIds);
+        if (bdData) {
+          setMyBadges(bdData.map(b => ({ id: b.id as string, name: b.name as string, emoji: b.emoji as string, color: b.color as string })));
+          setPermissions([...new Set((bdData as { permissions: string[] }[]).flatMap(b => b.permissions || []))]);
+        }
+      } else {
+        setMyBadges([]);
+        setPermissions([]);
+      }
+    };
+    load();
   }, [open, user]);
 
   if (!open || !user) return null;
@@ -63,12 +70,12 @@ const AccountModal = ({ open, onClose, onAdmin, onMemberPanel }: Props) => {
     setEditing(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) {
       setError("Prénom, nom et email sont requis.");
       return;
     }
-    const res = updateUser({ ...form, level: form.level as PadelLevel });
+    const res = await updateUser({ ...form, level: form.level as PadelLevel });
     if (!res.success) { setError(res.error || "Erreur."); return; }
     setEditing(false);
     setError("");

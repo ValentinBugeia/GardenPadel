@@ -175,7 +175,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
 
   const days = getWeekDays(weekOffset * 7);
 
-  const allMembers = currentUser?.role === "admin" ? [currentUser, ...users] : users;
+  const allMembers = users;
   const filteredUsers = allMembers.filter(u =>
     `${u.firstName} ${u.lastName} ${u.email} ${u.level}`.toLowerCase().includes(search.toLowerCase())
   );

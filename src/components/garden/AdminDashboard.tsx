@@ -10,6 +10,7 @@ interface Reservation {
   id: string; courtId: number; courtName: string;
   date: string; slot: string; userId: string;
   userFirstName: string; userLastName: string; userEmail: string; createdAt: string;
+  players: { id: string; firstName: string; lastName: string }[];
 }
 
 export interface AdminEvent {
@@ -57,6 +58,7 @@ const toReservation = (row: Record<string, unknown>): Reservation => ({
   userLastName:  (row.user_last_name as string) || "",
   userEmail:     (row.user_email as string) || "",
   createdAt:     (row.created_at as string) || new Date().toISOString(),
+  players:       (row.players as { id: string; firstName: string; lastName: string }[]) || [],
 });
 
 export interface Badge {
@@ -446,7 +448,13 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                                   {courtRes.map(r => (
                                     <div key={r.id} className={`rounded-xl px-3 py-2 border ${court.bg} ${court.border}`}>
                                       <div className={`text-[0.7rem] font-black ${court.text}`}>{r.slot}</div>
-                                      <div className="text-[0.7rem] font-semibold text-foreground mt-0.5">{r.userFirstName} {r.userLastName}</div>
+                                      {r.players.length > 0 ? (
+                                        r.players.map(p => (
+                                          <div key={p.id} className="text-[0.65rem] font-medium text-foreground leading-tight">{p.firstName} {p.lastName}</div>
+                                        ))
+                                      ) : (
+                                        <div className="text-[0.7rem] font-semibold text-foreground mt-0.5">{r.userFirstName} {r.userLastName}</div>
+                                      )}
                                     </div>
                                   ))}
                                 </>

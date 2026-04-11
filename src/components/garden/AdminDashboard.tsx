@@ -160,7 +160,10 @@ const AdminDashboard = ({ open, onClose }: Props) => {
         }
         setUserBadges(ub);
       }
-      if (rsRes.data) setReservations(rsRes.data.map(r => toReservation(r as Record<string, unknown>)));
+      if (rsRes.data) {
+        console.log("RAW reservations from Supabase:", JSON.stringify(rsRes.data.slice(0, 2)));
+        setReservations(rsRes.data.map(r => toReservation(r as Record<string, unknown>)));
+      }
       await refreshUsers();
     };
     load();

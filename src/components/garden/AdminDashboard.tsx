@@ -121,7 +121,7 @@ const getWeekDays = (startOffset: number) => {
 const inputCls = "w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all";
 
 const AdminDashboard = ({ open, onClose }: Props) => {
-  const { user: currentUser, users, logout } = useAuth();
+  const { user: currentUser, users, logout, refreshUsers } = useAuth();
   const [search, setSearch]     = useState("");
   const [tab, setTab]           = useState<"members"|"reservations"|"events"|"badges">("members");
   const [weekOffset, setWeekOffset] = useState(0);
@@ -159,6 +159,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
         setUserBadges(ub);
       }
       if (rsRes.data) setReservations(rsRes.data.map(r => toReservation(r as Record<string, unknown>)));
+      await refreshUsers();
     };
     load();
   }, [open, tab]);

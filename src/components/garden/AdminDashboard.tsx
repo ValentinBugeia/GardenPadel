@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil } from "lucide-react";
+import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil, Mail, MapPin, CreditCard, Ban, UserX, ChevronRight as ArrowRight } from "lucide-react";
 import flowerBlue from "@/assets/flower-blue.png";
 import { useAuth, type User } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -141,6 +141,11 @@ const AdminDashboard = ({ open, onClose }: Props) => {
   // Reservations state
   const [reservations, setReservations] = useState<Reservation[]>([]);
 
+  // Member detail state
+  const [selectedMember, setSelectedMember] = useState<User | null>(null);
+  const [memberConfirm, setMemberConfirm] = useState<"delete" | "ban" | null>(null);
+  const [memberActionLoading, setMemberActionLoading] = useState(false);
+
   // Chargement Supabase à chaque ouverture / changement d'onglet
   useEffect(() => {
     if (!open) return;
@@ -174,6 +179,34 @@ const AdminDashboard = ({ open, onClose }: Props) => {
   ), [badges, userBadges]);
 
   const days = getWeekDays(weekOffset * 7);
+
+  const handleCreditChange = async (member: User, delta: number) => {
+    const newCredits = Math.max(0, (member.credits ?? 0) + delta);
+    await supabase.from("profiles").update({ credits: newCredits }).eq("id", member.id);
+    await refreshUsers();
+    setSelectedMember(prev => prev?.id === member.id ? { ...prev, credits: newCredits } : prev);
+  };
+
+  const handleDeleteMember = async () => {
+    if (!selectedMember) return;
+    setMemberActionLoading(true);
+    await supabase.rpc("delete_user", { user_id: selectedMember.id });
+    await refreshUsers();
+    setSelectedMember(null);
+    setMemberConfirm(null);
+    setMemberActionLoading(false);
+  };
+
+  const handleBanMember = async () => {
+    if (!selectedMember) return;
+    setMemberActionLoading(true);
+    await supabase.from("banned_emails").insert({ email: selectedMember.email });
+    await supabase.rpc("delete_user", { user_id: selectedMember.id });
+    await refreshUsers();
+    setSelectedMember(null);
+    setMemberConfirm(null);
+    setMemberActionLoading(false);
+  };
 
   const allMembers = users;
   const filteredUsers = allMembers.filter(u =>
@@ -349,7 +382,11 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredUsers.map((u: User) => (
-                    <tr key={u.id} className="hover:bg-muted/30 transition-colors">
+                    <tr
+                      key={u.id}
+                      onClick={() => { setSelectedMember(u); setMemberConfirm(null); }}
+                      className={`hover:bg-muted/40 transition-colors cursor-pointer ${selectedMember?.id === u.id ? "bg-garden-blue/5" : ""}`}
+                    >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-garden-blue-light to-garden-pink-light flex items-center justify-center text-xs font-bold text-garden-blue-dark shrink-0">{u.firstName[0]}{u.lastName[0]}</div>
@@ -758,6 +795,135 @@ const AdminDashboard = ({ open, onClose }: Props) => {
             </div>
           )}
         </div>
+
+        {/* ── Member detail panel ── */}
+        {selectedMember && (
+          <div className="absolute inset-y-0 right-0 w-80 bg-background border-l border-border flex flex-col shadow-[-8px_0_32px_rgba(0,0,0,0.08)] z-10">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border shrink-0">
+              <h3 className="text-sm font-black text-foreground">Fiche membre</h3>
+              <button onClick={() => { setSelectedMember(null); setMemberConfirm(null); }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-4">
+              {/* Avatar + nom */}
+              <div className="flex flex-col items-center gap-2 py-2">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-garden-blue-light to-garden-pink-light flex items-center justify-center text-xl font-black text-garden-blue-dark">
+                  {selectedMember.firstName[0]}{selectedMember.lastName[0]}
+                </div>
+                <div className="text-center">
+                  <p className="font-black text-foreground">{selectedMember.firstName} {selectedMember.lastName}</p>
+                  <span className={`inline-block px-2.5 py-0.5 rounded-pill text-[0.7rem] font-bold mt-1 ${LEVEL_COLORS[selectedMember.level] || "bg-muted text-muted-foreground"}`}>
+                    <Trophy className="w-3 h-3 inline mr-1" />{selectedMember.level}
+                  </span>
+                </div>
+              </div>
+
+              {/* Infos */}
+              <div className="flex flex-col gap-2.5 bg-muted/30 rounded-2xl p-3.5">
+                <div className="flex items-start gap-2.5">
+                  <Mail className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[0.6rem] font-bold uppercase tracking-widest text-muted-foreground">Email</p>
+                    <p className="text-xs font-medium text-foreground break-all">{selectedMember.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Calendar className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[0.6rem] font-bold uppercase tracking-widest text-muted-foreground">Naissance</p>
+                    <p className="text-xs font-medium text-foreground">{selectedMember.birthDate ? new Date(selectedMember.birthDate).toLocaleDateString("fr-FR") : "—"}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[0.6rem] font-bold uppercase tracking-widest text-muted-foreground">Adresse</p>
+                    <p className="text-xs font-medium text-foreground">{selectedMember.address || "—"}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Shield className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[0.6rem] font-bold uppercase tracking-widest text-muted-foreground">Membre depuis</p>
+                    <p className="text-xs font-medium text-foreground">{new Date(selectedMember.createdAt).toLocaleDateString("fr-FR")}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Crédits */}
+              {selectedMember.role !== "admin" && !bookFreeIds.has(selectedMember.id) && (
+                <div className="bg-garden-blue/5 border border-garden-blue/20 rounded-2xl p-3.5">
+                  <p className="text-[0.6rem] font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-1.5">
+                    <CreditCard className="w-3 h-3" /> Crédits
+                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      onClick={() => handleCreditChange(selectedMember, -1)}
+                      disabled={(selectedMember.credits ?? 0) === 0}
+                      className="w-9 h-9 rounded-xl bg-background border border-border flex items-center justify-center text-lg font-bold text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >−</button>
+                    <div className="flex items-center gap-2">
+                      <img src={flowerBlue} alt="" className="h-5 w-auto" />
+                      <span className="text-2xl font-black text-garden-blue-dark">{selectedMember.credits ?? 0}</span>
+                    </div>
+                    <button
+                      onClick={() => handleCreditChange(selectedMember, 1)}
+                      className="w-9 h-9 rounded-xl bg-garden-blue text-white flex items-center justify-center text-lg font-bold hover:bg-garden-blue-dark transition-colors"
+                    >+</button>
+                  </div>
+                  <div className="flex gap-1.5 mt-3">
+                    {[5, 10, 15, 20].map(n => (
+                      <button key={n} onClick={() => handleCreditChange(selectedMember, n)} className="flex-1 py-1 rounded-lg bg-garden-blue/10 text-garden-blue-dark text-xs font-bold hover:bg-garden-blue/20 transition-colors">
+                        +{n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions danger */}
+              {selectedMember.role !== "admin" && (
+                <div className="flex flex-col gap-2 mt-auto pt-2 border-t border-border">
+                  {memberConfirm === null && (
+                    <>
+                      <button onClick={() => setMemberConfirm("delete")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 border border-red-200 transition-colors">
+                        <UserX className="w-4 h-4" /> Supprimer le compte
+                      </button>
+                      <button onClick={() => setMemberConfirm("ban")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-orange-600 hover:bg-orange-50 border border-orange-200 transition-colors">
+                        <Ban className="w-4 h-4" /> Bannir (email bloqué)
+                      </button>
+                    </>
+                  )}
+                  {memberConfirm === "delete" && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 flex flex-col gap-2">
+                      <p className="text-xs font-semibold text-red-700">Supprimer définitivement <strong>{selectedMember.firstName} {selectedMember.lastName}</strong> ?</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setMemberConfirm(null)} className="flex-1 py-2 rounded-lg text-xs font-semibold bg-background border border-border text-muted-foreground hover:text-foreground transition-colors">Annuler</button>
+                        <button onClick={handleDeleteMember} disabled={memberActionLoading} className="flex-1 py-2 rounded-lg text-xs font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-60">
+                          {memberActionLoading ? "…" : "Confirmer"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {memberConfirm === "ban" && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-3.5 flex flex-col gap-2">
+                      <p className="text-xs font-semibold text-orange-700">Bannir et supprimer <strong>{selectedMember.firstName}</strong> ? Son email <strong>{selectedMember.email}</strong> sera bloqué.</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setMemberConfirm(null)} className="flex-1 py-2 rounded-lg text-xs font-semibold bg-background border border-border text-muted-foreground hover:text-foreground transition-colors">Annuler</button>
+                        <button onClick={handleBanMember} disabled={memberActionLoading} className="flex-1 py-2 rounded-lg text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:opacity-60">
+                          {memberActionLoading ? "…" : "Bannir"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

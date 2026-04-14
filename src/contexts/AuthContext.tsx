@@ -109,6 +109,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // ── Connexion ───────────────────────────────────────────────
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    const { data: banned } = await supabase.from("banned_emails").select("email").eq("email", email).maybeSingle();
+    if (banned) return { success: false, error: "Ce compte a été suspendu. Contactez le club." };
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { success: false, error: "Identifiants incorrects." };
     return { success: true };

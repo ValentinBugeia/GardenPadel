@@ -21,6 +21,7 @@ import CalendarModal from "@/components/garden/CalendarModal";
 import MemberDashboard from "@/components/garden/MemberDashboard";
 import ResetPasswordModal from "@/components/garden/ResetPasswordModal";
 import DevisModal from "@/components/garden/DevisModal";
+import ContactModal from "@/components/garden/ContactModal";
 
 const Index = () => {
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -31,6 +32,7 @@ const Index = () => {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [memberPanelOpen, setMemberPanelOpen] = useState(false);
   const [devisOpen, setDevisOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
 
   const { user, isRecovering } = useAuth();
   const openLogin = () => { setRegisterOpen(false); setLoginOpen(true); };
@@ -50,7 +52,7 @@ const Index = () => {
       <Tournois onCalendar={() => setCalendarOpen(true)} onLogin={openLogin} />
       <CtaSection onRegister={openRegister} />
       <Tarifs />
-      <Contact />
+      <Contact onEmail={() => setContactOpen(true)} />
       <Footer />
       <BookingModal open={bookingOpen} onClose={() => setBookingOpen(false)} />
       <LoginModal
@@ -75,6 +77,7 @@ const Index = () => {
       <MemberDashboard open={memberPanelOpen} onClose={() => setMemberPanelOpen(false)} />
       <ResetPasswordModal open={isRecovering} onClose={() => {}} />
       <DevisModal open={devisOpen} onClose={() => setDevisOpen(false)} />
+      <ContactModal open={contactOpen} onClose={() => setContactOpen(false)} />
     </>
   );
 };

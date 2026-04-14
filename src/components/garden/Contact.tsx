@@ -1,7 +1,9 @@
 import { MapPin, Mail, Clock } from "lucide-react";
 import { type ReactNode } from "react";
 
-const Contact = () => (
+interface Props { onEmail: () => void; }
+
+const Contact = ({ onEmail }: Props) => (
   <section className="py-24 bg-background" id="contact">
     <div className="container">
       <div>
@@ -22,7 +24,7 @@ const Contact = () => (
               <div>
                 <div className="text-[0.7rem] uppercase tracking-wider text-muted-foreground font-semibold mb-0.5">{item.label}</div>
                 {item.isLink ? (
-                  <a href={`mailto:${item.value}`} className="text-[0.92rem] font-semibold text-garden-blue-dark">{item.value}</a>
+                  <button onClick={onEmail} className="text-[0.92rem] font-semibold text-garden-blue-dark hover:underline underline-offset-2 transition-colors text-left">{item.value}</button>
                 ) : (
                   <div className="text-[0.92rem] font-semibold text-foreground leading-relaxed whitespace-pre-line">{item.value}</div>
                 )}

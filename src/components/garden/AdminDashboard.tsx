@@ -143,6 +143,9 @@ const AdminDashboard = ({ open, onClose }: Props) => {
 
   // Member detail state
   const [selectedMember, setSelectedMember] = useState<User | null>(null);
+  const [pendingCredits, setPendingCredits] = useState<number>(0);
+  const [creditSaving, setCreditSaving] = useState(false);
+  const [creditSaved, setCreditSaved] = useState(false);
   const [memberConfirm, setMemberConfirm] = useState<"delete" | "ban" | null>(null);
   const [memberActionLoading, setMemberActionLoading] = useState(false);
 
@@ -180,11 +183,15 @@ const AdminDashboard = ({ open, onClose }: Props) => {
 
   const days = getWeekDays(weekOffset * 7);
 
-  const handleCreditChange = async (member: User, delta: number) => {
-    const newCredits = Math.max(0, (member.credits ?? 0) + delta);
-    await supabase.from("profiles").update({ credits: newCredits }).eq("id", member.id);
+  const handleSaveCredits = async () => {
+    if (!selectedMember) return;
+    setCreditSaving(true);
+    await supabase.from("profiles").update({ credits: pendingCredits }).eq("id", selectedMember.id);
     await refreshUsers();
-    setSelectedMember(prev => prev?.id === member.id ? { ...prev, credits: newCredits } : prev);
+    setSelectedMember(prev => prev ? { ...prev, credits: pendingCredits } : null);
+    setCreditSaving(false);
+    setCreditSaved(true);
+    setTimeout(() => setCreditSaved(false), 2000);
   };
 
   const handleDeleteMember = async () => {
@@ -384,7 +391,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                   {filteredUsers.map((u: User) => (
                     <tr
                       key={u.id}
-                      onClick={() => { setSelectedMember(u); setMemberConfirm(null); }}
+                      onClick={() => { setSelectedMember(u); setMemberConfirm(null); setPendingCredits(u.credits ?? 0); setCreditSaved(false); }}
                       className={`hover:bg-muted/40 transition-colors cursor-pointer ${selectedMember?.id === u.id ? "bg-garden-blue/5" : ""}`}
                     >
                       <td className="px-5 py-3.5">
@@ -861,26 +868,33 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                   </p>
                   <div className="flex items-center justify-between gap-3">
                     <button
-                      onClick={() => handleCreditChange(selectedMember, -1)}
-                      disabled={(selectedMember.credits ?? 0) === 0}
+                      onClick={() => setPendingCredits(c => Math.max(0, c - 1))}
+                      disabled={pendingCredits === 0}
                       className="w-9 h-9 rounded-xl bg-background border border-border flex items-center justify-center text-lg font-bold text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >−</button>
                     <div className="flex items-center gap-2">
                       <img src={flowerBlue} alt="" className="h-5 w-auto" />
-                      <span className="text-2xl font-black text-garden-blue-dark">{selectedMember.credits ?? 0}</span>
+                      <span className="text-2xl font-black text-garden-blue-dark">{pendingCredits}</span>
                     </div>
                     <button
-                      onClick={() => handleCreditChange(selectedMember, 1)}
+                      onClick={() => setPendingCredits(c => c + 1)}
                       className="w-9 h-9 rounded-xl bg-garden-blue text-white flex items-center justify-center text-lg font-bold hover:bg-garden-blue-dark transition-colors"
                     >+</button>
                   </div>
                   <div className="flex gap-1.5 mt-3">
                     {[5, 10, 15, 20].map(n => (
-                      <button key={n} onClick={() => handleCreditChange(selectedMember, n)} className="flex-1 py-1 rounded-lg bg-garden-blue/10 text-garden-blue-dark text-xs font-bold hover:bg-garden-blue/20 transition-colors">
+                      <button key={n} onClick={() => setPendingCredits(c => c + n)} className="flex-1 py-1 rounded-lg bg-garden-blue/10 text-garden-blue-dark text-xs font-bold hover:bg-garden-blue/20 transition-colors">
                         +{n}
                       </button>
                     ))}
                   </div>
+                  <button
+                    onClick={handleSaveCredits}
+                    disabled={creditSaving || pendingCredits === (selectedMember.credits ?? 0)}
+                    className="mt-3 w-full py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-garden-blue text-white hover:bg-garden-blue-dark"
+                  >
+                    {creditSaving ? "Enregistrement…" : creditSaved ? "✓ Crédits sauvegardés" : "Valider les crédits"}
+                  </button>
                 </div>
               )}
 

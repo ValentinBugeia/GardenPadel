@@ -20,8 +20,7 @@ const Events = () => (
           <div className="relative z-[1] p-9 text-white">
             <div className="mb-3"><Wine className="w-10 h-10 text-garden-blue" /></div>
             <h3 className="text-2xl font-extrabold mb-2.5">Garden Afterwork</h3>
-            <p className="text-sm text-white/75 leading-relaxed mb-5">Chaque jeudi et vendredi soir, décompressez après le travail. Padel, cocktails et bonne humeur. Formule all-inclusive disponible.</p>
-            <a href="mailto:contact@gardenpadel.fr?subject=Afterwork" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill font-bold text-sm bg-garden-blue text-white shadow-blue transition-all duration-300 hover:bg-garden-blue-dark hover:-translate-y-0.5">Je m'inscris →</a>
+            <p className="text-sm text-white/75 leading-relaxed">Chaque jeudi et vendredi soir, décompressez après le travail. Padel, cocktails et bonne humeur. Formule all-inclusive disponible.</p>
           </div>
         </div>
 

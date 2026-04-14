@@ -1,6 +1,8 @@
 import { Sparkles, Wine, Handshake } from "lucide-react";
 
-const Events = () => (
+interface Props { onDevis: () => void; }
+
+const Events = ({ onDevis }: Props) => (
   <section className="py-24" id="evenements">
     <div className="container">
       <div>
@@ -35,7 +37,7 @@ const Events = () => (
             <div className="mb-3"><Handshake className="w-10 h-10 text-garden-pink" /></div>
             <h3 className="text-2xl font-extrabold mb-2.5">Séminaires d'Entreprise</h3>
             <p className="text-sm text-white/75 leading-relaxed mb-5">Privatisez le club pour votre team-building : tournoi interne, repas et animation garantis. Le padel, sport de cohésion par excellence.</p>
-            <a href="mailto:contact@gardenpadel.fr?subject=Séminaire" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill font-bold text-sm bg-garden-pink text-white shadow-pink transition-all duration-300 hover:bg-garden-pink-dark hover:-translate-y-0.5">Demander un devis →</a>
+            <button onClick={onDevis} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill font-bold text-sm bg-garden-pink text-white shadow-pink transition-all duration-300 hover:bg-garden-pink-dark hover:-translate-y-0.5">Demander un devis →</button>
           </div>
         </div>
       </div>

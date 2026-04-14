@@ -216,9 +216,9 @@ const AdminDashboard = ({ open, onClose }: Props) => {
   };
 
   const allMembers = users;
-  const filteredUsers = allMembers.filter(u =>
-    `${u.firstName} ${u.lastName} ${u.email} ${u.level}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredUsers = allMembers
+    .filter(u => `${u.firstName} ${u.lastName} ${u.email} ${u.level}`.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "fr"));
   const getResForDayAndCourt = (date: string, courtId: number) =>
     reservations.filter(r => r.date === date && r.courtId === courtId).sort((a, b) => a.slot.localeCompare(b.slot));
 

@@ -305,6 +305,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
   if (!open) return null;
 
   return (
+    <>
     <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="absolute inset-0 bg-foreground/70 backdrop-blur-md" aria-hidden="true" />
 
@@ -990,6 +991,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
       </div>
     </div>
     <EventRegistrantsModal ev={selectedEvent} onClose={() => setSelectedEvent(null)} />
+    </>
   );
 };
 

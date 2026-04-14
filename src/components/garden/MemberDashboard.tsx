@@ -420,7 +420,7 @@ const MemberDashboard = ({ open, onClose }: Props) => {
         </div>
       </div>
     </div>
-    <EventRegistrantsModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+    <EventRegistrantsModal ev={selectedEvent} onClose={() => setSelectedEvent(null)} />
   );
 };
 

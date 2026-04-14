@@ -989,7 +989,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
         )}
       </div>
     </div>
-    <EventRegistrantsModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+    <EventRegistrantsModal ev={selectedEvent} onClose={() => setSelectedEvent(null)} />
   );
 };
 

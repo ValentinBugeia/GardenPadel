@@ -3,7 +3,7 @@ import { X, Users, Calendar, Clock, Trophy, Dumbbell, PartyPopper, Briefcase, Mo
 import { supabase } from "@/lib/supabase";
 import type { AdminEvent } from "./AdminDashboard";
 
-interface Props { event: AdminEvent | null; onClose: () => void; }
+interface Props { ev: AdminEvent | null; onClose: () => void; }
 
 interface Registrant { userId: string; firstName: string; lastName: string; }
 
@@ -15,15 +15,15 @@ const TYPE_CFG = {
   autre:     { label: "Autre",     Icon: MoreHorizontal, color: "bg-muted-foreground/80 text-white",  light: "bg-muted" },
 } as const;
 
-const EventRegistrantsModal = ({ event, onClose }: Props) => {
+const EventRegistrantsModal = ({ ev, onClose }: Props) => {
   const [registrants, setRegistrants] = useState<Registrant[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!event) return;
+    if (!ev) return;
     setRegistrants([]);
     setLoading(true);
-    const eventKey = `${event.date}__${event.title}`;
+    const eventKey = `${ev.date}__${ev.title}`;
     (async () => {
       const { data: regsData } = await supabase
         .from("event_registrations")
@@ -47,13 +47,13 @@ const EventRegistrantsModal = ({ event, onClose }: Props) => {
       }
       setLoading(false);
     })();
-  }, [event?.id]);
+  }, [ev?.id]);
 
-  if (!event) return null;
+  if (!ev) return null;
 
-  const cfg = TYPE_CFG[event.type];
+  const cfg = TYPE_CFG[ev.type];
   const { Icon } = cfg;
-  const capacity = event.maxPlaces;
+  const capacity = ev.maxPlaces;
 
   return (
     <div
@@ -70,7 +70,7 @@ const EventRegistrantsModal = ({ event, onClose }: Props) => {
               <Icon className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-black tracking-tight text-foreground">{event.title}</h2>
+              <h2 className="text-base font-black tracking-tight text-foreground">{ev.title}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">{cfg.label}</p>
             </div>
           </div>
@@ -84,12 +84,12 @@ const EventRegistrantsModal = ({ event, onClose }: Props) => {
           <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
             <span className="flex items-center gap-1.5 text-foreground">
               <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              {new Date(event.date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+              {new Date(ev.date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
             </span>
-            {event.slot && (
+            {ev.slot && (
               <span className="flex items-center gap-1.5 text-foreground">
                 <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                {event.slot}
+                {ev.slot}
               </span>
             )}
           </div>
@@ -105,7 +105,7 @@ const EventRegistrantsModal = ({ event, onClose }: Props) => {
               )}
             </div>
           )}
-          {event.desc && <p className="mt-2 text-xs text-muted-foreground">{event.desc}</p>}
+          {ev.desc && <p className="mt-2 text-xs text-muted-foreground">{ev.desc}</p>}
         </div>
 
         {/* Registrants list */}

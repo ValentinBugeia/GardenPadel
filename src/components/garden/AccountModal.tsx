@@ -231,17 +231,15 @@ const AccountModal = ({ open, onClose, onAdmin, onMemberPanel }: Props) => {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-center gap-1 flex-wrap">
-                  {Array.from({ length: Math.max(user.credits ?? 0, 0) }).map((_, i) => (
-                    <img key={i} src={flowerBlue} alt="crédit" className="h-7 w-auto drop-shadow-sm" />
-                  ))}
-                  {(user.credits ?? 0) === 0 && (
-                    <p className="text-xs text-muted-foreground italic">Aucun crédit disponible</p>
-                  )}
+                <div className="flex flex-col items-center gap-1">
+                  <div className="flex items-center gap-2">
+                    <img src={flowerBlue} alt="crédit" className="h-7 w-auto drop-shadow-sm" />
+                    <span className="text-3xl font-black text-garden-blue leading-none">{user.credits ?? 0}</span>
+                  </div>
+                  <p className="text-[0.7rem] text-muted-foreground">
+                    crédit{(user.credits ?? 0) !== 1 ? "s" : ""} disponible{(user.credits ?? 0) !== 1 ? "s" : ""}
+                  </p>
                 </div>
-                <p className="text-center text-[0.7rem] text-muted-foreground mt-1.5">
-                  {user.credits ?? 0} crédit{(user.credits ?? 0) !== 1 ? "s" : ""}
-                </p>
 
                 {/* Acheter des crédits */}
                 <div className="mt-4">

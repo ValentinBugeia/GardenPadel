@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { X, Calendar, Dumbbell, PartyPopper, Plus, ChevronLeft, ChevronRight, Target, Medal, Flower2, Trash2, Shield, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AdminEvent } from "./AdminDashboard";

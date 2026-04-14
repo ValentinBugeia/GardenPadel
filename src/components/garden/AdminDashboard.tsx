@@ -301,7 +301,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
     <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="absolute inset-0 bg-foreground/70 backdrop-blur-md" aria-hidden="true" />
 
-      <div className="relative bg-background rounded-3xl shadow-[0_32px_80px_rgba(0,0,0,0.25)] w-full max-w-[960px] max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="relative bg-background rounded-3xl shadow-[0_32px_80px_rgba(0,0,0,0.25)] w-full max-w-[1200px] max-h-[90vh] flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-7 pt-6 pb-5 border-b border-border shrink-0">

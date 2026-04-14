@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Mail, User, MessageSquare, FileText, CheckCircle2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 interface Props { open: boolean; onClose: () => void; }
 
@@ -7,7 +8,9 @@ const inputCls = "w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted/
 
 const ContactModal = ({ open, onClose }: Props) => {
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+  const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -16,7 +19,7 @@ const ContactModal = ({ open, onClose }: Props) => {
   }, [onClose]);
 
   useEffect(() => {
-    if (!open) { setSent(false); setForm({ name: "", email: "", subject: "", message: "" }); }
+    if (!open) { setSent(false); setError(""); setForm({ name: "", email: "", subject: "", message: "" }); }
   }, [open]);
 
   if (!open) return null;
@@ -24,14 +27,22 @@ const ContactModal = ({ open, onClose }: Props) => {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const subject = encodeURIComponent(form.subject || `Message de ${form.name}`);
-    const body = encodeURIComponent(
-      `De : ${form.name}\nEmail : ${form.email}\n\n${form.message}`
-    );
-    window.location.href = `mailto:contact@gardenpadel.fr?subject=${subject}&body=${body}`;
-    setTimeout(() => setSent(true), 400);
+    setLoading(true);
+    setError("");
+    const { error: err } = await supabase.from("contact_messages").insert({
+      name: form.name.trim(),
+      email: form.email.trim(),
+      subject: form.subject.trim(),
+      message: form.message.trim(),
+    });
+    if (err) {
+      setError("Une erreur est survenue. Veuillez réessayer.");
+    } else {
+      setSent(true);
+    }
+    setLoading(false);
   };
 
   return (
@@ -47,7 +58,7 @@ const ContactModal = ({ open, onClose }: Props) => {
             </div>
             <div>
               <h2 className="text-lg font-black tracking-tight text-foreground">Nous contacter</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">contact@gardenpadel.fr</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Garden Padel Club</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
@@ -78,10 +89,11 @@ const ContactModal = ({ open, onClose }: Props) => {
                 </div>
               </div>
 
-              <button type="submit" className="w-full py-3.5 rounded-2xl font-bold text-sm bg-garden-blue text-white hover:bg-garden-blue-dark transition-all duration-300 hover:-translate-y-0.5 shadow-blue mt-1">
-                Envoyer le message →
+              {error && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}
+
+              <button type="submit" disabled={loading} className="w-full py-3.5 rounded-2xl font-bold text-sm bg-garden-blue text-white hover:bg-garden-blue-dark transition-all duration-300 hover:-translate-y-0.5 shadow-blue mt-1 disabled:opacity-60 disabled:translate-y-0 disabled:cursor-not-allowed">
+                {loading ? "Envoi…" : "Envoyer le message →"}
               </button>
-              <p className="text-center text-[0.65rem] text-muted-foreground">Votre client mail s'ouvrira avec le message pré-rempli.</p>
             </form>
           ) : (
             <div className="flex flex-col items-center text-center gap-4 py-6">
@@ -89,8 +101,8 @@ const ContactModal = ({ open, onClose }: Props) => {
                 <CheckCircle2 className="w-7 h-7 text-garden-blue-dark" />
               </div>
               <div>
-                <h3 className="text-xl font-black text-foreground">Message prêt !</h3>
-                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">Votre client mail s'est ouvert avec votre message.<br />Envoyez-le pour que nous puissions vous répondre.</p>
+                <h3 className="text-xl font-black text-foreground">Message envoyé !</h3>
+                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">Notre équipe vous répondra dans les meilleurs délais à l'adresse <strong>{form.email}</strong>.</p>
               </div>
               <button onClick={onClose} className="w-full py-3.5 rounded-2xl font-bold text-sm bg-garden-blue text-white hover:bg-garden-blue-dark transition-all mt-2">
                 Fermer

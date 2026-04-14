@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil, Mail, MapPin, CreditCard, Ban, UserX, ChevronRight as ArrowRight } from "lucide-react";
+import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil, Mail, MapPin, CreditCard, Ban, UserX, ChevronRight as ArrowRight, MessageSquare, Circle } from "lucide-react";
 import EventRegistrantsModal from "./EventRegistrantsModal";
 import flowerBlue from "@/assets/flower-blue.png";
 import { useAuth, type User } from "@/contexts/AuthContext";
@@ -61,6 +61,16 @@ const toReservation = (row: Record<string, unknown>): Reservation => ({
   createdAt:     (row.created_at as string) || new Date().toISOString(),
   players:       Array.isArray(row.players) ? (row.players as { id: string; firstName: string; lastName: string }[]) : typeof row.players === "string" ? JSON.parse(row.players) : [],
 });
+
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
 
 export interface Badge {
   id: string;
@@ -127,7 +137,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
   const { user: currentUser, users, logout, refreshUsers } = useAuth();
   const [search, setSearch]         = useState("");
   const [badgeSearch, setBadgeSearch] = useState("");
-  const [tab, setTab]               = useState<"members"|"reservations"|"events"|"badges">("members");
+  const [tab, setTab]               = useState<"members"|"reservations"|"events"|"badges"|"messages">("members");
   const [weekOffset, setWeekOffset] = useState(0);
 
   // Events state
@@ -142,6 +152,10 @@ const AdminDashboard = ({ open, onClose }: Props) => {
 
   // Reservations state
   const [reservations, setReservations] = useState<Reservation[]>([]);
+
+  // Messages state
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [expandedMsg, setExpandedMsg] = useState<string | null>(null);
 
   // Event detail state
   const [selectedEvent, setSelectedEvent] = useState<AdminEvent | null>(null);
@@ -158,11 +172,12 @@ const AdminDashboard = ({ open, onClose }: Props) => {
   useEffect(() => {
     if (!open) return;
     const load = async () => {
-      const [evRes, bdRes, ubRes, rsRes] = await Promise.all([
+      const [evRes, bdRes, ubRes, rsRes, msgRes] = await Promise.all([
         supabase.from("events").select("*").order("date"),
         supabase.from("badges").select("*").order("created_at"),
         supabase.from("user_badges").select("*"),
         supabase.from("reservations").select("*").order("date"),
+        supabase.from("contact_messages").select("*").order("created_at", { ascending: false }),
       ]);
       if (evRes.data) setEvents(evRes.data.map(r => toAdminEvent(r as Record<string, unknown>)));
       if (bdRes.data) setBadges(bdRes.data.map(r => toBadge(r as Record<string, unknown>)));
@@ -174,6 +189,15 @@ const AdminDashboard = ({ open, onClose }: Props) => {
         setUserBadges(ub);
       }
       if (rsRes.data) setReservations(rsRes.data.map(r => toReservation(r as Record<string, unknown>)));
+      if (msgRes.data) setMessages(msgRes.data.map(r => ({
+        id: r.id as string,
+        name: r.name as string,
+        email: r.email as string,
+        subject: (r.subject as string) || "",
+        message: r.message as string,
+        read: r.read as boolean,
+        createdAt: r.created_at as string,
+      })));
       await refreshUsers();
     };
     load();
@@ -295,10 +319,13 @@ const AdminDashboard = ({ open, onClose }: Props) => {
     }
   };
 
+  const unreadCount = messages.filter(m => !m.read).length;
+
   const subLabel = () => {
     if (tab === "members")      return `${users.length} membre${users.length > 1 ? "s" : ""} inscrit${users.length > 1 ? "s" : ""}`;
     if (tab === "reservations") return `${reservations.length} réservation${reservations.length > 1 ? "s" : ""}`;
     if (tab === "events")       return `${events.length} événement${events.length > 1 ? "s" : ""}`;
+    if (tab === "messages")     return `${messages.length} message${messages.length > 1 ? "s" : ""}${unreadCount > 0 ? ` · ${unreadCount} non lu${unreadCount > 1 ? "s" : ""}` : ""}`;
     return `${badges.length} badge${badges.length > 1 ? "s" : ""} · ${Object.values(userBadges).flat().length} attribution${Object.values(userBadges).flat().length > 1 ? "s" : ""}`;
   };
 
@@ -346,6 +373,12 @@ const AdminDashboard = ({ open, onClose }: Props) => {
             </button>
             <button onClick={() => setTab("badges")} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${tab === "badges" ? "bg-garden-blue text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
               <Shield className="w-4 h-4" /> Badges
+            </button>
+            <button onClick={() => setTab("messages")} className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${tab === "messages" ? "bg-garden-pink text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+              <MessageSquare className="w-4 h-4" /> Messages
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[0.6rem] font-black flex items-center justify-center">{unreadCount}</span>
+              )}
             </button>
           </div>
 
@@ -840,6 +873,92 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                     );
                   })}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Messages ── */}
+          {tab === "messages" && (
+            <div className="p-7 flex flex-col gap-3">
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center py-16 text-center">
+                  <MessageSquare className="w-10 h-10 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">Aucun message reçu pour le moment.</p>
+                </div>
+              ) : (
+                messages.map(msg => {
+                  const expanded = expandedMsg === msg.id;
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`rounded-2xl border transition-all ${msg.read ? "bg-background border-border" : "bg-garden-pink-light border-garden-pink/30"}`}
+                    >
+                      {/* Summary row */}
+                      <div
+                        className="flex items-center gap-4 px-5 py-4 cursor-pointer"
+                        onClick={async () => {
+                          setExpandedMsg(expanded ? null : msg.id);
+                          if (!msg.read) {
+                            await supabase.from("contact_messages").update({ read: true }).eq("id", msg.id);
+                            setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, read: true } : m));
+                          }
+                        }}
+                      >
+                        {!msg.read && <Circle className="w-2 h-2 fill-garden-pink text-garden-pink shrink-0" />}
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-garden-blue-light to-garden-pink-light flex items-center justify-center text-xs font-bold text-garden-blue-dark shrink-0">
+                          {msg.name[0].toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className={`text-sm font-bold truncate ${msg.read ? "text-foreground" : "text-garden-pink-dark"}`}>{msg.name}</span>
+                            <span className="text-xs text-muted-foreground">{msg.email}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
+                            {msg.subject ? <><strong>{msg.subject}</strong> — </> : ""}{msg.message}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-[0.65rem] text-muted-foreground">
+                            {new Date(msg.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                          <button
+                            onClick={async e => {
+                              e.stopPropagation();
+                              await supabase.from("contact_messages").delete().eq("id", msg.id);
+                              setMessages(prev => prev.filter(m => m.id !== msg.id));
+                              if (expandedMsg === msg.id) setExpandedMsg(null);
+                            }}
+                            className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expanded message */}
+                      {expanded && (
+                        <div className="px-5 pb-5 flex flex-col gap-3 border-t border-border/50 pt-4">
+                          {msg.subject && (
+                            <div>
+                              <p className="text-[0.65rem] font-bold uppercase tracking-widest text-muted-foreground mb-1">Objet</p>
+                              <p className="text-sm font-semibold text-foreground">{msg.subject}</p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-[0.65rem] font-bold uppercase tracking-widest text-muted-foreground mb-1">Message</p>
+                            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                          </div>
+                          <a
+                            href={`mailto:${msg.email}?subject=Re: ${encodeURIComponent(msg.subject || "Votre message")}`}
+                            className="self-start inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-garden-blue text-white hover:bg-garden-blue-dark transition-all"
+                          >
+                            <Mail className="w-3.5 h-3.5" /> Répondre par email
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           )}

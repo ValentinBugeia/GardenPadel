@@ -47,7 +47,7 @@ const Index = () => {
       <Courts onBooking={openBooking} />
       <ClubHouse />
       <Events onDevis={() => setDevisOpen(true)} />
-      <Tournois onCalendar={() => setCalendarOpen(true)} />
+      <Tournois onCalendar={() => setCalendarOpen(true)} onLogin={openLogin} />
       <CtaSection onRegister={openRegister} />
       <Tarifs />
       <Contact />

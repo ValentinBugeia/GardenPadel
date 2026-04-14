@@ -34,17 +34,22 @@ const LoginModal = ({ open, onClose, onSwitchToRegister, onAdminOpen }: Props) =
     e.preventDefault();
     setError("");
     setLoading(true);
-    const result = await login(email, password);
-    setLoading(false);
-    if (result.success) {
-      if (email === "admin@gardenpadel.fr") {
-        onClose();
-        onAdminOpen();
+    try {
+      const result = await login(email, password);
+      if (result.success) {
+        if (email === "admin@gardenpadel.fr") {
+          onClose();
+          onAdminOpen();
+        } else {
+          onClose();
+        }
       } else {
-        onClose();
+        setError(result.error || "Identifiants incorrects.");
       }
-    } else {
-      setError(result.error || "Identifiants incorrects.");
+    } catch {
+      setError("Une erreur est survenue, réessaie.");
+    } finally {
+      setLoading(false);
     }
   };
 

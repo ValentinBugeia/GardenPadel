@@ -215,10 +215,12 @@ const AdminDashboard = ({ open, onClose }: Props) => {
     setMemberActionLoading(false);
   };
 
-  const allMembers = users;
-  const filteredUsers = allMembers
-    .filter(u => `${u.firstName} ${u.lastName} ${u.email} ${u.level}`.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "fr"));
+  const allMembers = [...users].sort((a, b) =>
+    `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "fr")
+  );
+  const filteredUsers = allMembers.filter(u =>
+    `${u.firstName} ${u.lastName} ${u.email} ${u.level}`.toLowerCase().includes(search.toLowerCase())
+  );
   const getResForDayAndCourt = (date: string, courtId: number) =>
     reservations.filter(r => r.date === date && r.courtId === courtId).sort((a, b) => a.slot.localeCompare(b.slot));
 
@@ -631,7 +633,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                   <div className="text-sm text-muted-foreground text-center py-10">Aucun membre.</div>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {users.map(u => {
+                    {allMembers.map(u => {
                       const memberBadgeIds = userBadges[u.id] || [];
                       const memberBadges = memberBadgeIds.map(bid => badges.find(b => b.id === bid)).filter(Boolean) as Badge[];
                       const availableBadges = badges.filter(b => !memberBadgeIds.includes(b.id));

@@ -1,18 +1,12 @@
-import { useState, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { X, ChevronLeft, ChevronRight, Trophy, PartyPopper, Briefcase, CheckCircle2, LogIn, Dumbbell, MoreHorizontal } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-
-const STORAGE_REGISTRATIONS = "gp_tournament_registrations";
-const STORAGE_EVENTS = "gp_admin_events";
+import { supabase } from "@/lib/supabase";
 
 interface Registration {
   eventKey: string;
   userId: string;
-  registeredAt: string;
 }
-
-const getRegistrations = (): Registration[] =>
-  JSON.parse(localStorage.getItem(STORAGE_REGISTRATIONS) || "[]");
 
 type EventType = "tournoi" | "soiree" | "seminaire" | "coaching" | "autre";
 
@@ -40,20 +34,6 @@ const DAYS   = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
 
 const PUBLIC_TYPES: EventType[] = ["tournoi", "soiree", "coaching"];
 
-const getAdminEvents = (): CalEvent[] => {
-  const raw = JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]");
-  return raw
-    .filter((e: { type: string }) => PUBLIC_TYPES.includes(e.type as EventType))
-    .map((e: { date: string; type: string; title: string; desc: string; slot: string; maxPlaces?: number }) => ({
-      date: e.date,
-      type: (e.type as EventType),
-      title: e.title,
-      desc: e.desc || "",
-      time: e.slot || undefined,
-      maxPlaces: e.maxPlaces,
-      fromAdmin: true,
-    }));
-};
 
 const getEventsForDate = (date: string, adminEvents: CalEvent[]) =>
   adminEvents.filter(e => e.date === date);
@@ -80,33 +60,61 @@ const CalendarModal = ({ open, onClose }: Props) => {
   const [year,  setYear]  = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [registrations, setRegistrations] = useState<Registration[]>(getRegistrations);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [adminEvents, setAdminEvents] = useState<CalEvent[]>([]);
   const [justRegistered, setJustRegistered] = useState<string | null>(null);
 
-  // Recharge les événements admin à chaque ouverture
-  const adminEvents = useMemo(() => open ? getAdminEvents() : [], [open]);
+  // Chargement Supabase à chaque ouverture
+  useEffect(() => {
+    if (!open) return;
+    const load = async () => {
+      const [evRes, regRes] = await Promise.all([
+        supabase.from("events").select("id, type, title, date, slot, description, max_places"),
+        supabase.from("event_registrations").select("event_key, user_id"),
+      ]);
+      if (evRes.data) {
+        setAdminEvents(
+          evRes.data
+            .filter(e => PUBLIC_TYPES.includes(e.type as EventType))
+            .map(e => ({
+              date: e.date as string,
+              type: e.type as EventType,
+              title: e.title as string,
+              desc: (e.description as string) || "",
+              time: (e.slot as string) || undefined,
+              maxPlaces: e.max_places as number | undefined,
+              fromAdmin: true,
+            }))
+        );
+      }
+      if (regRes.data) {
+        setRegistrations(regRes.data.map(r => ({ eventKey: r.event_key as string, userId: r.user_id as string })));
+      }
+    };
+    load();
+  }, [open]);
 
   const eventKey = (ev: CalEvent) => `${ev.date}__${ev.title}`;
 
   const isRegistered = (ev: CalEvent) =>
     !!registrations.find(r => r.eventKey === eventKey(ev) && r.userId === user?.id);
 
-  const handleRegister = (ev: CalEvent) => {
+  const handleRegister = async (ev: CalEvent) => {
     if (!user) return;
     const key = eventKey(ev);
-    const updated: Registration[] = [...registrations, { eventKey: key, userId: user.id, registeredAt: new Date().toISOString() }];
-    localStorage.setItem(STORAGE_REGISTRATIONS, JSON.stringify(updated));
-    setRegistrations(updated);
-    setJustRegistered(key);
-    setTimeout(() => setJustRegistered(null), 2000);
+    const { error } = await supabase.from("event_registrations").insert({ event_key: key, user_id: user.id });
+    if (!error) {
+      setRegistrations(prev => [...prev, { eventKey: key, userId: user.id }]);
+      setJustRegistered(key);
+      setTimeout(() => setJustRegistered(null), 2000);
+    }
   };
 
-  const handleUnregister = (ev: CalEvent) => {
+  const handleUnregister = async (ev: CalEvent) => {
     if (!user) return;
     const key = eventKey(ev);
-    const updated = registrations.filter(r => !(r.eventKey === key && r.userId === user.id));
-    localStorage.setItem(STORAGE_REGISTRATIONS, JSON.stringify(updated));
-    setRegistrations(updated);
+    await supabase.from("event_registrations").delete().eq("event_key", key).eq("user_id", user.id);
+    setRegistrations(prev => prev.filter(r => !(r.eventKey === key && r.userId === user.id)));
   };
 
   if (!open) return null;

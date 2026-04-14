@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil } from "lucide-react";
+import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil, Mail, MapPin, CreditCard, Ban, UserX, ChevronRight as ArrowRight } from "lucide-react";
 import flowerBlue from "@/assets/flower-blue.png";
 import { useAuth, type User } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 interface Props { open: boolean; onClose: () => void; }
 
@@ -9,6 +10,7 @@ interface Reservation {
   id: string; courtId: number; courtName: string;
   date: string; slot: string; userId: string;
   userFirstName: string; userLastName: string; userEmail: string; createdAt: string;
+  players: { id: string; firstName: string; lastName: string }[];
 }
 
 export interface AdminEvent {
@@ -23,10 +25,41 @@ export interface AdminEvent {
   createdAt: string;
 }
 
-const STORAGE_RESERVATIONS = "gp_reservations";
-export const STORAGE_EVENTS    = "gp_admin_events";
-export const STORAGE_BADGES    = "gp_badges";
-export const STORAGE_USER_BADGES = "gp_user_badges";
+// DB → local type converters
+const toAdminEvent = (row: Record<string, unknown>): AdminEvent => ({
+  id:        row.id as string,
+  type:      row.type as AdminEvent["type"],
+  title:     row.title as string,
+  date:      row.date as string,
+  slot:      (row.slot as string) || "",
+  courtIds:  (row.court_ids as number[]) || [],
+  maxPlaces: row.max_places as number | undefined,
+  desc:      (row.description as string) || "",
+  createdAt: (row.created_at as string) || new Date().toISOString(),
+});
+
+const toBadge = (row: Record<string, unknown>): Badge => ({
+  id:          row.id as string,
+  name:        row.name as string,
+  emoji:       (row.emoji as string) || "",
+  color:       (row.color as string) || "#6ab5db",
+  permissions: (row.permissions as string[]) || [],
+  createdAt:   (row.created_at as string) || new Date().toISOString(),
+});
+
+const toReservation = (row: Record<string, unknown>): Reservation => ({
+  id:            row.id as string,
+  courtId:       row.court_id as number,
+  courtName:     (row.court_name as string) || "",
+  date:          row.date as string,
+  slot:          row.slot as string,
+  userId:        (row.user_id as string) || "",
+  userFirstName: (row.user_first_name as string) || "",
+  userLastName:  (row.user_last_name as string) || "",
+  userEmail:     (row.user_email as string) || "",
+  createdAt:     (row.created_at as string) || new Date().toISOString(),
+  players:       Array.isArray(row.players) ? (row.players as { id: string; firstName: string; lastName: string }[]) : typeof row.players === "string" ? JSON.parse(row.players) : [],
+});
 
 export interface Badge {
   id: string;
@@ -90,28 +123,55 @@ const getWeekDays = (startOffset: number) => {
 const inputCls = "w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all";
 
 const AdminDashboard = ({ open, onClose }: Props) => {
-  const { user: currentUser, users, logout } = useAuth();
+  const { user: currentUser, users, logout, refreshUsers } = useAuth();
   const [search, setSearch]     = useState("");
   const [tab, setTab]           = useState<"members"|"reservations"|"events"|"badges">("members");
   const [weekOffset, setWeekOffset] = useState(0);
 
   // Events state
-  const [events, setEvents]         = useState<AdminEvent[]>(() => JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]"));
+  const [events, setEvents]         = useState<AdminEvent[]>([]);
   const [showForm, setShowForm]     = useState(false);
   const [form, setForm]             = useState({ type: "seminaire" as AdminEvent["type"], title: "", date: "", slot: "", courtIds: [] as number[], maxPlaces: 8, desc: "" });
 
   // Badges state
-  const [badges, setBadges]             = useState<Badge[]>(() => JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]"));
-  const [userBadges, setUserBadges]     = useState<Record<string, string[]>>(() => JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}"));
+  const [badges, setBadges]         = useState<Badge[]>([]);
+  const [userBadges, setUserBadges] = useState<Record<string, string[]>>({});
   const [badgeEditState, setBadgeEditState] = useState<{ id?: string; name: string; emoji: string; color: string; permissions: string[] } | null>(null);
 
-  // Rechargement localStorage à chaque ouverture / changement d'onglet
+  // Reservations state
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+
+  // Member detail state
+  const [selectedMember, setSelectedMember] = useState<User | null>(null);
+  const [pendingCredits, setPendingCredits] = useState<number>(0);
+  const [creditSaving, setCreditSaving] = useState(false);
+  const [creditSaved, setCreditSaved] = useState(false);
+  const [memberConfirm, setMemberConfirm] = useState<"delete" | "ban" | null>(null);
+  const [memberActionLoading, setMemberActionLoading] = useState(false);
+
+  // Chargement Supabase à chaque ouverture / changement d'onglet
   useEffect(() => {
-    if (open) {
-      setEvents(JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]"));
-      setBadges(JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]"));
-      setUserBadges(JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}"));
-    }
+    if (!open) return;
+    const load = async () => {
+      const [evRes, bdRes, ubRes, rsRes] = await Promise.all([
+        supabase.from("events").select("*").order("date"),
+        supabase.from("badges").select("*").order("created_at"),
+        supabase.from("user_badges").select("*"),
+        supabase.from("reservations").select("*").order("date"),
+      ]);
+      if (evRes.data) setEvents(evRes.data.map(r => toAdminEvent(r as Record<string, unknown>)));
+      if (bdRes.data) setBadges(bdRes.data.map(r => toBadge(r as Record<string, unknown>)));
+      if (ubRes.data) {
+        const ub: Record<string, string[]> = {};
+        for (const row of ubRes.data as { user_id: string; badge_id: string }[]) {
+          ub[row.user_id] = ub[row.user_id] ? [...ub[row.user_id], row.badge_id] : [row.badge_id];
+        }
+        setUserBadges(ub);
+      }
+      if (rsRes.data) setReservations(rsRes.data.map(r => toReservation(r as Record<string, unknown>)));
+      await refreshUsers();
+    };
+    load();
   }, [open, tab]);
 
   // IDs des membres ayant la permission "book_free"
@@ -121,13 +181,44 @@ const AdminDashboard = ({ open, onClose }: Props) => {
       .map(([userId]) => userId)
   ), [badges, userBadges]);
 
-  const reservations: Reservation[] = JSON.parse(localStorage.getItem(STORAGE_RESERVATIONS) || "[]");
   const days = getWeekDays(weekOffset * 7);
 
-  const allMembers = currentUser?.role === "admin" ? [currentUser, ...users] : users;
-  const filteredUsers = allMembers.filter(u =>
-    `${u.firstName} ${u.lastName} ${u.email} ${u.level}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const handleSaveCredits = async () => {
+    if (!selectedMember) return;
+    setCreditSaving(true);
+    await supabase.rpc("admin_update_credits", { target_user_id: selectedMember.id, new_credits: pendingCredits });
+    await refreshUsers();
+    setSelectedMember(prev => prev ? { ...prev, credits: pendingCredits } : null);
+    setCreditSaving(false);
+    setCreditSaved(true);
+    setTimeout(() => setCreditSaved(false), 2000);
+  };
+
+  const handleDeleteMember = async () => {
+    if (!selectedMember) return;
+    setMemberActionLoading(true);
+    await supabase.rpc("delete_user", { user_id: selectedMember.id });
+    await refreshUsers();
+    setSelectedMember(null);
+    setMemberConfirm(null);
+    setMemberActionLoading(false);
+  };
+
+  const handleBanMember = async () => {
+    if (!selectedMember) return;
+    setMemberActionLoading(true);
+    await supabase.from("banned_emails").insert({ email: selectedMember.email });
+    await supabase.rpc("delete_user", { user_id: selectedMember.id });
+    await refreshUsers();
+    setSelectedMember(null);
+    setMemberConfirm(null);
+    setMemberActionLoading(false);
+  };
+
+  const allMembers = users;
+  const filteredUsers = allMembers
+    .filter(u => `${u.firstName} ${u.lastName} ${u.email} ${u.level}`.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "fr"));
   const getResForDayAndCourt = (date: string, courtId: number) =>
     reservations.filter(r => r.date === date && r.courtId === courtId).sort((a, b) => a.slot.localeCompare(b.slot));
 
@@ -138,60 +229,63 @@ const AdminDashboard = ({ open, onClose }: Props) => {
   const toggleCourt = (id: number) =>
     setForm(f => ({ ...f, courtIds: f.courtIds.includes(id) ? f.courtIds.filter(c => c !== id) : [...f.courtIds, id] }));
 
-  const saveEvent = () => {
+  const saveEvent = async () => {
     if (!form.title || !form.date) return;
     if (selectedType.usesTerrain && (!form.slot || form.courtIds.length === 0)) return;
-    const ev: AdminEvent = {
-      id: `ev-${Date.now()}`, type: form.type, title: form.title, date: form.date,
-      slot: form.slot, courtIds: form.courtIds, desc: form.desc,
-      ...(form.type === "coaching" ? { maxPlaces: form.maxPlaces } : {}),
-      createdAt: new Date().toISOString(),
+    const newRow = {
+      id: `ev-${Date.now()}`,
+      type: form.type, title: form.title, date: form.date,
+      slot: form.slot, court_ids: form.courtIds,
+      max_places: form.type === "coaching" ? form.maxPlaces : null,
+      description: form.desc,
     };
-    const updated = [...events, ev].sort((a, b) => a.date.localeCompare(b.date));
-    localStorage.setItem(STORAGE_EVENTS, JSON.stringify(updated));
-    setEvents(updated);
-    setForm({ type: "seminaire", title: "", date: "", slot: "", courtIds: [], desc: "" });
+    const { data, error } = await supabase.from("events").insert(newRow).select().single();
+    if (!error && data) {
+      const ev = toAdminEvent(data as Record<string, unknown>);
+      setEvents(prev => [...prev, ev].sort((a, b) => a.date.localeCompare(b.date)));
+    }
+    setForm({ type: "seminaire", title: "", date: "", slot: "", courtIds: [], maxPlaces: 8, desc: "" });
     setShowForm(false);
   };
 
-  const deleteEvent = (id: string) => {
-    const updated = events.filter(e => e.id !== id);
-    localStorage.setItem(STORAGE_EVENTS, JSON.stringify(updated));
-    setEvents(updated);
+  const deleteEvent = async (id: string) => {
+    await supabase.from("events").delete().eq("id", id);
+    setEvents(prev => prev.filter(e => e.id !== id));
   };
 
   // ── Badge CRUD ──────────────────────────────────────────────────────────
-  const saveBadge = () => {
+  const saveBadge = async () => {
     if (!badgeEditState || !badgeEditState.name.trim()) return;
-    let updated: Badge[];
-    if (badgeEditState.id) {
-      updated = badges.map(b => b.id === badgeEditState.id ? { ...b, ...badgeEditState } as Badge : b);
-    } else {
-      const newBadge: Badge = { id: `badge-${Date.now()}`, name: badgeEditState.name, emoji: badgeEditState.emoji, color: badgeEditState.color, permissions: badgeEditState.permissions, createdAt: new Date().toISOString() };
-      updated = [...badges, newBadge];
+    const row = {
+      id: badgeEditState.id || `badge-${Date.now()}`,
+      name: badgeEditState.name, emoji: badgeEditState.emoji,
+      color: badgeEditState.color, permissions: badgeEditState.permissions,
+    };
+    const { data, error } = await supabase.from("badges").upsert(row).select().single();
+    if (!error && data) {
+      const badge = toBadge(data as Record<string, unknown>);
+      setBadges(prev => badgeEditState.id ? prev.map(b => b.id === badge.id ? badge : b) : [...prev, badge]);
     }
-    localStorage.setItem(STORAGE_BADGES, JSON.stringify(updated));
-    setBadges(updated);
     setBadgeEditState(null);
   };
 
-  const deleteBadge = (id: string) => {
-    const updated = badges.filter(b => b.id !== id);
-    localStorage.setItem(STORAGE_BADGES, JSON.stringify(updated));
-    setBadges(updated);
-    // Retirer ce badge de tous les membres
-    const ub = Object.fromEntries(Object.entries(userBadges).map(([uid, bids]) => [uid, bids.filter(bid => bid !== id)]));
-    localStorage.setItem(STORAGE_USER_BADGES, JSON.stringify(ub));
-    setUserBadges(ub);
+  const deleteBadge = async (id: string) => {
+    await supabase.from("badges").delete().eq("id", id);
+    setBadges(prev => prev.filter(b => b.id !== id));
+    setUserBadges(prev => Object.fromEntries(
+      Object.entries(prev).map(([uid, bids]) => [uid, bids.filter(bid => bid !== id)])
+    ));
   };
 
-  const toggleUserBadge = (userId: string, badgeId: string) => {
+  const toggleUserBadge = async (userId: string, badgeId: string) => {
     const current = userBadges[userId] || [];
-    const updated = current.includes(badgeId)
-      ? { ...userBadges, [userId]: current.filter(id => id !== badgeId) }
-      : { ...userBadges, [userId]: [...current, badgeId] };
-    localStorage.setItem(STORAGE_USER_BADGES, JSON.stringify(updated));
-    setUserBadges(updated);
+    if (current.includes(badgeId)) {
+      await supabase.from("user_badges").delete().eq("user_id", userId).eq("badge_id", badgeId);
+      setUserBadges(prev => ({ ...prev, [userId]: current.filter(id => id !== badgeId) }));
+    } else {
+      await supabase.from("user_badges").insert({ user_id: userId, badge_id: badgeId });
+      setUserBadges(prev => ({ ...prev, [userId]: [...current, badgeId] }));
+    }
   };
 
   const subLabel = () => {
@@ -295,11 +389,22 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredUsers.map((u: User) => (
-                    <tr key={u.id} className="hover:bg-muted/30 transition-colors">
+                    <tr
+                      key={u.id}
+                      onClick={() => { setSelectedMember(u); setMemberConfirm(null); setPendingCredits(u.credits ?? 0); setCreditSaved(false); }}
+                      className={`hover:bg-muted/40 transition-colors cursor-pointer ${selectedMember?.id === u.id ? "bg-garden-blue/5" : ""}`}
+                    >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-garden-blue-light to-garden-pink-light flex items-center justify-center text-xs font-bold text-garden-blue-dark shrink-0">{u.firstName[0]}{u.lastName[0]}</div>
-                          <span className="font-semibold text-foreground">{u.firstName} {u.lastName}</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-foreground">{u.firstName} {u.lastName}</span>
+                            {u.role === "admin" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.6rem] font-bold bg-garden-blue text-white w-fit">
+                                <Shield className="w-2.5 h-2.5" /> Administrateur
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-muted-foreground">{u.email}</td>
@@ -394,7 +499,15 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                                   {courtRes.map(r => (
                                     <div key={r.id} className={`rounded-xl px-3 py-2 border ${court.bg} ${court.border}`}>
                                       <div className={`text-[0.7rem] font-black ${court.text}`}>{r.slot}</div>
-                                      <div className="text-[0.7rem] font-semibold text-foreground mt-0.5">{r.userFirstName} {r.userLastName}</div>
+                                      {r.players.length > 0 ? (
+                                        <div className="text-[0.65rem] text-foreground leading-tight mt-0.5">
+                                          {r.players.map((p, i) => (
+                                            <div key={i} className="font-medium truncate">{p.firstName} {p.lastName}</div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="text-[0.7rem] font-semibold text-foreground mt-0.5">{r.userFirstName} {r.userLastName}</div>
+                                      )}
                                     </div>
                                   ))}
                                 </>
@@ -530,7 +643,12 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-foreground truncate">{u.firstName} {u.lastName}</p>
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {memberBadges.length === 0 ? (
+                              {u.role === "admin" && (
+                                <span className="inline-flex items-center gap-1 text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-garden-blue text-white">
+                                  <Shield className="w-2.5 h-2.5" /> Administrateur
+                                </span>
+                              )}
+                              {memberBadges.length === 0 && u.role !== "admin" ? (
                                 <span className="text-[0.65rem] text-muted-foreground italic">Aucun badge</span>
                               ) : memberBadges.map(badge => (
                                 <button key={badge.id} onClick={() => toggleUserBadge(u.id, badge.id)} title="Cliquer pour retirer"
@@ -696,6 +814,150 @@ const AdminDashboard = ({ open, onClose }: Props) => {
             </div>
           )}
         </div>
+
+        {/* ── Member detail panel ── */}
+        {selectedMember && (
+          <div className="absolute inset-y-0 right-0 w-80 bg-background border-l border-border flex flex-col shadow-[-8px_0_32px_rgba(0,0,0,0.08)] z-10">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border shrink-0">
+              <h3 className="text-sm font-black text-foreground">Fiche membre</h3>
+              <button onClick={() => { setSelectedMember(null); setMemberConfirm(null); }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-4">
+              {/* Avatar + nom */}
+              <div className="flex flex-col items-center gap-2 py-2">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-garden-blue-light to-garden-pink-light flex items-center justify-center text-xl font-black text-garden-blue-dark">
+                  {selectedMember.firstName[0]}{selectedMember.lastName[0]}
+                </div>
+                <div className="text-center">
+                  <p className="font-black text-foreground">{selectedMember.firstName} {selectedMember.lastName}</p>
+                  <div className="flex flex-wrap justify-center gap-1.5 mt-1.5">
+                    {selectedMember.role === "admin" ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.7rem] font-bold bg-garden-blue text-white">
+                        <Shield className="w-3 h-3" /> Administrateur
+                      </span>
+                    ) : (
+                      <span className={`inline-block px-2.5 py-0.5 rounded-pill text-[0.7rem] font-bold ${LEVEL_COLORS[selectedMember.level] || "bg-muted text-muted-foreground"}`}>
+                        <Trophy className="w-3 h-3 inline mr-1" />{selectedMember.level}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Infos */}
+              <div className="flex flex-col gap-2.5 bg-muted/30 rounded-2xl p-3.5">
+                <div className="flex items-start gap-2.5">
+                  <Mail className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[0.6rem] font-bold uppercase tracking-widest text-muted-foreground">Email</p>
+                    <p className="text-xs font-medium text-foreground break-all">{selectedMember.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Calendar className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[0.6rem] font-bold uppercase tracking-widest text-muted-foreground">Naissance</p>
+                    <p className="text-xs font-medium text-foreground">{selectedMember.birthDate ? new Date(selectedMember.birthDate).toLocaleDateString("fr-FR") : "—"}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[0.6rem] font-bold uppercase tracking-widest text-muted-foreground">Adresse</p>
+                    <p className="text-xs font-medium text-foreground">{selectedMember.address || "—"}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Shield className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[0.6rem] font-bold uppercase tracking-widest text-muted-foreground">Membre depuis</p>
+                    <p className="text-xs font-medium text-foreground">{new Date(selectedMember.createdAt).toLocaleDateString("fr-FR")}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Crédits */}
+              {selectedMember.role !== "admin" && !bookFreeIds.has(selectedMember.id) && (
+                <div className="bg-garden-blue/5 border border-garden-blue/20 rounded-2xl p-3.5">
+                  <p className="text-[0.6rem] font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-1.5">
+                    <CreditCard className="w-3 h-3" /> Crédits
+                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      onClick={() => setPendingCredits(c => Math.max(0, c - 1))}
+                      disabled={pendingCredits === 0}
+                      className="w-9 h-9 rounded-xl bg-background border border-border flex items-center justify-center text-lg font-bold text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >−</button>
+                    <div className="flex items-center gap-2">
+                      <img src={flowerBlue} alt="" className="h-5 w-auto" />
+                      <span className="text-2xl font-black text-garden-blue-dark">{pendingCredits}</span>
+                    </div>
+                    <button
+                      onClick={() => setPendingCredits(c => c + 1)}
+                      className="w-9 h-9 rounded-xl bg-garden-blue text-white flex items-center justify-center text-lg font-bold hover:bg-garden-blue-dark transition-colors"
+                    >+</button>
+                  </div>
+                  <div className="flex gap-1.5 mt-3">
+                    {[5, 10, 15, 20].map(n => (
+                      <button key={n} onClick={() => setPendingCredits(c => c + n)} className="flex-1 py-1 rounded-lg bg-garden-blue/10 text-garden-blue-dark text-xs font-bold hover:bg-garden-blue/20 transition-colors">
+                        +{n}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleSaveCredits}
+                    disabled={creditSaving || pendingCredits === (selectedMember.credits ?? 0)}
+                    className="mt-3 w-full py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-garden-blue text-white hover:bg-garden-blue-dark"
+                  >
+                    {creditSaving ? "Enregistrement…" : creditSaved ? "✓ Crédits sauvegardés" : "Valider les crédits"}
+                  </button>
+                </div>
+              )}
+
+              {/* Actions danger */}
+              {selectedMember.role !== "admin" && (
+                <div className="flex flex-col gap-2 mt-auto pt-2 border-t border-border">
+                  {memberConfirm === null && (
+                    <>
+                      <button onClick={() => setMemberConfirm("delete")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 border border-red-200 transition-colors">
+                        <UserX className="w-4 h-4" /> Supprimer le compte
+                      </button>
+                      <button onClick={() => setMemberConfirm("ban")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-orange-600 hover:bg-orange-50 border border-orange-200 transition-colors">
+                        <Ban className="w-4 h-4" /> Bannir (email bloqué)
+                      </button>
+                    </>
+                  )}
+                  {memberConfirm === "delete" && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 flex flex-col gap-2">
+                      <p className="text-xs font-semibold text-red-700">Supprimer définitivement <strong>{selectedMember.firstName} {selectedMember.lastName}</strong> ?</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setMemberConfirm(null)} className="flex-1 py-2 rounded-lg text-xs font-semibold bg-background border border-border text-muted-foreground hover:text-foreground transition-colors">Annuler</button>
+                        <button onClick={handleDeleteMember} disabled={memberActionLoading} className="flex-1 py-2 rounded-lg text-xs font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-60">
+                          {memberActionLoading ? "…" : "Confirmer"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {memberConfirm === "ban" && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-3.5 flex flex-col gap-2">
+                      <p className="text-xs font-semibold text-orange-700">Bannir et supprimer <strong>{selectedMember.firstName}</strong> ? Son email <strong>{selectedMember.email}</strong> sera bloqué.</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setMemberConfirm(null)} className="flex-1 py-2 rounded-lg text-xs font-semibold bg-background border border-border text-muted-foreground hover:text-foreground transition-colors">Annuler</button>
+                        <button onClick={handleBanMember} disabled={memberActionLoading} className="flex-1 py-2 rounded-lg text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:opacity-60">
+                          {memberActionLoading ? "…" : "Bannir"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,10 +1,15 @@
 import { useState, useEffect } from "react";
-import { X, LogOut, Mail, MapPin, Calendar, Trophy, ShieldCheck, Settings, Pencil, Check, AlertCircle, LayoutDashboard } from "lucide-react";
+import { X, LogOut, Mail, MapPin, Calendar, Trophy, ShieldCheck, Settings, Pencil, Check, AlertCircle, LayoutDashboard, Plus, ShoppingCart } from "lucide-react";
 import { useAuth, type PadelLevel } from "@/contexts/AuthContext";
 import flowerBlue from "@/assets/flower-blue.png";
+import { supabase } from "@/lib/supabase";
 
-const STORAGE_BADGES      = "gp_badges";
-const STORAGE_USER_BADGES = "gp_user_badges";
+const CREDIT_PACKS = [
+  { credits: 5,  price: 25 },
+  { credits: 10, price: 45 },
+  { credits: 15, price: 60 },
+  { credits: 20, price: 75 },
+];
 const MEMBER_PANEL_PERMS  = ["view_planning", "manage_coaching", "manage_soirees"];
 
 const LEVEL_COLORS: Record<string, string> = {
@@ -35,15 +40,26 @@ const AccountModal = ({ open, onClose, onAdmin, onMemberPanel }: Props) => {
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", address: "", birthDate: "", level: "" as PadelLevel });
   const [myBadges, setMyBadges] = useState<{ id: string; name: string; emoji: string; color: string }[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [buyingPack, setBuyingPack] = useState<number | null>(null);
+  const [buySuccess, setBuySuccess] = useState<number | null>(null);
 
   useEffect(() => {
-    if (open && user) {
-      const ub: Record<string, string[]> = JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}");
-      const ab: { id: string; name: string; emoji: string; color: string; permissions: string[] }[] = JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]");
-      const ids = ub[user.id] || [];
-      setMyBadges(ids.map(id => ab.find(b => b.id === id)).filter(Boolean) as typeof myBadges);
-      setPermissions([...new Set(ids.flatMap(bid => ab.find(b => b.id === bid)?.permissions ?? []))]);
-    }
+    if (!open || !user) return;
+    const load = async () => {
+      const { data: ubData } = await supabase.from("user_badges").select("badge_id").eq("user_id", user.id);
+      const badgeIds = (ubData || []).map(r => (r as { badge_id: string }).badge_id);
+      if (badgeIds.length > 0) {
+        const { data: bdData } = await supabase.from("badges").select("id, name, emoji, color, permissions").in("id", badgeIds);
+        if (bdData) {
+          setMyBadges(bdData.map(b => ({ id: b.id as string, name: b.name as string, emoji: b.emoji as string, color: b.color as string })));
+          setPermissions([...new Set((bdData as { permissions: string[] }[]).flatMap(b => b.permissions || []))]);
+        }
+      } else {
+        setMyBadges([]);
+        setPermissions([]);
+      }
+    };
+    load();
   }, [open, user]);
 
   if (!open || !user) return null;
@@ -63,15 +79,25 @@ const AccountModal = ({ open, onClose, onAdmin, onMemberPanel }: Props) => {
     setEditing(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) {
       setError("Prénom, nom et email sont requis.");
       return;
     }
-    const res = updateUser({ ...form, level: form.level as PadelLevel });
+    const res = await updateUser({ ...form, level: form.level as PadelLevel });
     if (!res.success) { setError(res.error || "Erreur."); return; }
     setEditing(false);
     setError("");
+  };
+
+  const handleBuy = async (pack: typeof CREDIT_PACKS[0]) => {
+    if (!user) return;
+    setBuyingPack(pack.credits);
+    const newCredits = (user.credits ?? 0) + pack.credits;
+    await updateUser({ credits: newCredits });
+    setBuyingPack(null);
+    setBuySuccess(pack.credits);
+    setTimeout(() => setBuySuccess(null), 3000);
   };
 
   const birthFormatted = user.birthDate
@@ -205,17 +231,48 @@ const AccountModal = ({ open, onClose, onAdmin, onMemberPanel }: Props) => {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-center gap-1 flex-wrap">
-                  {Array.from({ length: Math.max(user.credits ?? 0, 0) }).map((_, i) => (
-                    <img key={i} src={flowerBlue} alt="crédit" className="h-7 w-auto drop-shadow-sm" />
-                  ))}
-                  {(user.credits ?? 0) === 0 && (
-                    <p className="text-xs text-muted-foreground italic">Aucun crédit disponible</p>
-                  )}
+                <div className="flex flex-col items-center gap-1">
+                  <div className="flex items-center gap-2">
+                    <img src={flowerBlue} alt="crédit" className="h-7 w-auto drop-shadow-sm" />
+                    <span className="text-3xl font-black text-garden-blue leading-none">{user.credits ?? 0}</span>
+                  </div>
+                  <p className="text-[0.7rem] text-muted-foreground">
+                    crédit{(user.credits ?? 0) !== 1 ? "s" : ""} disponible{(user.credits ?? 0) !== 1 ? "s" : ""}
+                  </p>
                 </div>
-                <p className="text-center text-[0.7rem] text-muted-foreground mt-1.5">
-                  {user.credits ?? 0} crédit{(user.credits ?? 0) !== 1 ? "s" : ""}
-                </p>
+
+                {/* Acheter des crédits */}
+                <div className="mt-4">
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <ShoppingCart className="w-3 h-3" /> Acheter des crédits
+                  </p>
+                  {buySuccess && (
+                    <div className="mb-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-garden-blue/10 border border-garden-blue/20 text-garden-blue-dark text-xs font-semibold">
+                      <Check className="w-3.5 h-3.5" /> +{buySuccess} crédits ajoutés !
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    {CREDIT_PACKS.map(pack => (
+                      <button
+                        key={pack.credits}
+                        onClick={() => handleBuy(pack)}
+                        disabled={buyingPack !== null}
+                        className="flex flex-col items-center gap-0.5 px-3 py-3 rounded-2xl border-2 border-garden-blue/20 bg-garden-blue/5 hover:bg-garden-blue/10 hover:border-garden-blue/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                      >
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: Math.min(pack.credits, 5) }).map((_, i) => (
+                            <img key={i} src={flowerBlue} alt="" className="h-4 w-auto" />
+                          ))}
+                          {pack.credits > 5 && <Plus className="w-3 h-3 text-garden-blue" />}
+                        </div>
+                        <span className="text-sm font-black text-garden-blue-dark mt-1">
+                          {buyingPack === pack.credits ? "…" : `${pack.credits} crédits`}
+                        </span>
+                        <span className="text-[0.65rem] font-semibold text-muted-foreground">{pack.price}€</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </>
             )}
           </div>

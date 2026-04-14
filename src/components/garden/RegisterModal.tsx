@@ -17,9 +17,10 @@ const RegisterModal = ({ open, onClose, onSwitchToLogin }: Props) => {
     address: "", birthDate: "", level: "Débutant",
   });
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword]       = useState(false);
+  const [error, setError]                     = useState("");
+  const [success, setSuccess]                 = useState(false);
+  const [loading, setLoading]                 = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -32,10 +33,10 @@ const RegisterModal = ({ open, onClose, onSwitchToLogin }: Props) => {
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
-  const set = (field: keyof RegisterData, value: string | number) =>
+  const set = (field: keyof RegisterData, value: string) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (form.password !== confirmPassword) { setError("Les mots de passe ne correspondent pas."); return; }
@@ -44,7 +45,10 @@ const RegisterModal = ({ open, onClose, onSwitchToLogin }: Props) => {
     const age = Math.floor((Date.now() - new Date(form.birthDate).getTime()) / (365.25 * 24 * 3600 * 1000));
     if (age < 7) { setError("Vous devez avoir au moins 7 ans pour vous inscrire."); return; }
 
-    const result = register(form);
+    setLoading(true);
+    const result = await register(form);
+    setLoading(false);
+
     if (result.success) {
       setSuccess(true);
       setTimeout(() => { onClose(); setSuccess(false); }, 1500);
@@ -64,7 +68,6 @@ const RegisterModal = ({ open, onClose, onSwitchToLogin }: Props) => {
 
       <div className="relative bg-background rounded-3xl shadow-[0_32px_80px_rgba(0,0,0,0.2)] w-full max-w-[500px] max-h-[90vh] overflow-y-auto">
         <div className="px-8 pt-8 pb-8">
-          {/* Header */}
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-xl font-black tracking-tight text-foreground">Créer un compte</h2>
@@ -87,77 +90,54 @@ const RegisterModal = ({ open, onClose, onSwitchToLogin }: Props) => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              {/* Prénom + Nom */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Prénom</label>
                   <div className="relative">
                     <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <input
-                      type="text" value={form.firstName} onChange={e => set("firstName", e.target.value)}
-                      placeholder="Marie" required
-                      className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all"
-                    />
+                    <input type="text" value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Marie" required
+                      className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all" />
                   </div>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Nom</label>
                   <div className="relative">
                     <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <input
-                      type="text" value={form.lastName} onChange={e => set("lastName", e.target.value)}
-                      placeholder="Dupont" required
-                      className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all"
-                    />
+                    <input type="text" value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dupont" required
+                      className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all" />
                   </div>
                 </div>
               </div>
 
-              {/* Email */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Adresse email</label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="email" value={form.email} onChange={e => set("email", e.target.value)}
-                    placeholder="vous@exemple.fr" required
-                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all"
-                  />
+                  <input type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="vous@exemple.fr" required
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all" />
                 </div>
               </div>
 
-              {/* Adresse postale */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Adresse postale</label>
                 <div className="relative">
                   <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="text" value={form.address} onChange={e => set("address", e.target.value)}
-                    placeholder="12 rue des Fleurs, 83140 Six-Fours" required
-                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all"
-                  />
+                  <input type="text" value={form.address} onChange={e => set("address", e.target.value)} placeholder="12 rue des Fleurs, 83140 Six-Fours" required
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all" />
                 </div>
               </div>
 
-              {/* Date de naissance + Niveau */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Date de naissance</label>
-                  <div className="relative">
-                    <input
-                      type="date" value={form.birthDate} onChange={e => set("birthDate", e.target.value)}
-                      max={new Date().toISOString().split("T")[0]} required
-                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all"
-                    />
-                  </div>
+                  <input type="date" value={form.birthDate} onChange={e => set("birthDate", e.target.value)} max={new Date().toISOString().split("T")[0]} required
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all" />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Niveau de padel</label>
                   <div className="relative">
-                    <select
-                      value={form.level} onChange={e => set("level", e.target.value as PadelLevel)} required
-                      className="w-full pl-3 pr-8 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all"
-                    >
+                    <select value={form.level} onChange={e => set("level", e.target.value as PadelLevel)} required
+                      className="w-full pl-3 pr-8 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all">
                       {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
@@ -165,44 +145,33 @@ const RegisterModal = ({ open, onClose, onSwitchToLogin }: Props) => {
                 </div>
               </div>
 
-              {/* Mot de passe */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Mot de passe</label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type={showPassword ? "text" : "password"} value={form.password} onChange={e => set("password", e.target.value)}
-                    placeholder="Min. 6 caractères" required
-                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all"
-                  />
+                  <input type={showPassword ? "text" : "password"} value={form.password} onChange={e => set("password", e.target.value)} placeholder="Min. 6 caractères" required
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
-              {/* Confirmation mot de passe */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Confirmer le mot de passe</label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type={showPassword ? "text" : "password"} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                    placeholder="Répétez votre mot de passe" required
-                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all"
-                  />
+                  <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Répétez votre mot de passe" required
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-muted/40 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-garden-blue/40 focus:border-garden-blue transition-all" />
                 </div>
               </div>
 
-              {/* Erreur */}
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">
-                  {error}
-                </div>
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>
               )}
 
-              <button type="submit" className="w-full py-3.5 rounded-2xl font-bold text-sm bg-garden-pink text-white shadow-pink transition-all duration-300 hover:bg-garden-pink-dark hover:-translate-y-0.5 mt-1">
-                Créer mon compte
+              <button type="submit" disabled={loading} className="w-full py-3.5 rounded-2xl font-bold text-sm bg-garden-pink text-white shadow-pink transition-all duration-300 hover:bg-garden-pink-dark hover:-translate-y-0.5 mt-1 disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0">
+                {loading ? "Création du compte…" : "Créer mon compte"}
               </button>
 
               <p className="text-center text-sm text-muted-foreground">

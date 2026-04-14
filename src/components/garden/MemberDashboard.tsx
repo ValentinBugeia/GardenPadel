@@ -2,11 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { X, Calendar, Dumbbell, PartyPopper, Plus, ChevronLeft, ChevronRight, Target, Medal, Flower2, Trash2, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AdminEvent } from "./AdminDashboard";
-
-const STORAGE_EVENTS      = "gp_admin_events";
-const STORAGE_RESERVATIONS = "gp_reservations";
-const STORAGE_BADGES      = "gp_badges";
-const STORAGE_USER_BADGES = "gp_user_badges";
+import { supabase } from "@/lib/supabase";
 
 const SLOTS = [
   "08:00 – 09:30","09:30 – 11:00","11:00 – 12:30",
@@ -48,62 +44,100 @@ interface Props { open: boolean; onClose: () => void; }
 const MemberDashboard = ({ open, onClose }: Props) => {
   const { user } = useAuth();
 
-  // ── Permissions du membre via ses badges ──────────────────────────────────
-  const permissions = useMemo(() => {
-    if (!open || !user) return [];
-    const ub: Record<string, string[]> = JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}");
-    const ab: { id: string; permissions: string[] }[] = JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]");
-    const ids = ub[user.id] || [];
-    return [...new Set(ids.flatMap(bid => ab.find(b => b.id === bid)?.permissions ?? []))];
-  }, [open, user]);
+  const [permissions, setPermissions] = useState<string[]>([]);
+  const [memberBadges, setMemberBadges] = useState<{ id: string; name: string; emoji: string; color: string }[]>([]);
 
   const canViewPlanning   = permissions.includes("view_planning");
   const canManageCoaching = permissions.includes("manage_coaching");
   const canManageSoirees  = permissions.includes("manage_soirees");
 
-  const defaultTab = canViewPlanning ? "planning" : canManageCoaching ? "coaching" : "soirees";
-  const [tab, setTab]           = useState(defaultTab);
+  const [tab, setTab]           = useState("soirees");
   const [weekOffset, setWeekOffset] = useState(0);
   const [events, setEvents]     = useState<AdminEvent[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm]         = useState({ title: "", date: "", slot: "", desc: "", maxPlaces: 8 });
 
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+
+  // Chargement Supabase
   useEffect(() => {
-    if (open) {
-      setEvents(JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]"));
-      setTab(defaultTab);
-    }
-  }, [open, defaultTab]);
+    if (!open || !user) return;
+    const load = async () => {
+      // Badges & permissions
+      const { data: ubData } = await supabase.from("user_badges").select("badge_id").eq("user_id", user.id);
+      const badgeIds = (ubData || []).map(r => (r as { badge_id: string }).badge_id);
+      if (badgeIds.length > 0) {
+        const { data: bdData } = await supabase.from("badges").select("id, name, emoji, color, permissions").in("id", badgeIds);
+        if (bdData) {
+          setMemberBadges(bdData.map(b => ({ id: b.id as string, name: b.name as string, emoji: b.emoji as string, color: b.color as string })));
+          const perms = [...new Set((bdData as { permissions: string[] }[]).flatMap(b => b.permissions || []))];
+          setPermissions(perms);
+          // Définir l'onglet par défaut selon les permissions chargées
+          const dt = perms.includes("view_planning") ? "planning" : perms.includes("manage_coaching") ? "coaching" : "soirees";
+          setTab(dt);
+        }
+      }
+      // Events & reservations
+      const [evRes, rsRes] = await Promise.all([
+        supabase.from("events").select("*").order("date"),
+        supabase.from("reservations").select("id, court_id, date, slot, user_first_name, user_last_name").order("date"),
+      ]);
+      if (evRes.data) setEvents(evRes.data.map(e => ({
+        id: e.id as string,
+        type: e.type as AdminEvent["type"],
+        title: e.title as string,
+        date: e.date as string,
+        slot: (e.slot as string) || "",
+        courtIds: (e.court_ids as number[]) || [],
+        maxPlaces: e.max_places as number | undefined,
+        desc: (e.description as string) || "",
+        createdAt: (e.created_at as string) || "",
+      })));
+      if (rsRes.data) setReservations(rsRes.data.map(r => ({
+        id: r.id as string,
+        courtId: r.court_id as number,
+        date: r.date as string,
+        slot: r.slot as string,
+        userFirstName: (r.user_first_name as string) || "",
+        userLastName: (r.user_last_name as string) || "",
+      })));
+    };
+    load();
+  }, [open, user]);
 
   useEffect(() => {
-    if (open) setEvents(JSON.parse(localStorage.getItem(STORAGE_EVENTS) || "[]"));
     setShowForm(false);
-  }, [tab, open]);
-
-  const reservations: Reservation[] = JSON.parse(localStorage.getItem(STORAGE_RESERVATIONS) || "[]");
+  }, [tab]);
   const days = getWeekDays(weekOffset * 7);
   const getResForDayAndCourt = (date: string, courtId: number) =>
     reservations.filter(r => r.date === date && r.courtId === courtId).sort((a, b) => a.slot.localeCompare(b.slot));
 
-  const saveEvent = (type: "coaching" | "soiree") => {
+  const saveEvent = async (type: "coaching" | "soiree") => {
     if (!form.title || !form.date) return;
-    const ev: AdminEvent = {
-      id: `ev-${Date.now()}`, type, title: form.title, date: form.date,
-      slot: form.slot, courtIds: [], desc: form.desc,
-      ...(type === "coaching" ? { maxPlaces: form.maxPlaces } : {}),
-      createdAt: new Date().toISOString(),
+    const newRow = {
+      id: `ev-${Date.now()}`,
+      type, title: form.title, date: form.date,
+      slot: form.slot, court_ids: [],
+      max_places: type === "coaching" ? form.maxPlaces : null,
+      description: form.desc,
     };
-    const updated = [...events, ev].sort((a, b) => a.date.localeCompare(b.date));
-    localStorage.setItem(STORAGE_EVENTS, JSON.stringify(updated));
-    setEvents(updated);
+    const { data, error } = await supabase.from("events").insert(newRow).select().single();
+    if (!error && data) {
+      const ev: AdminEvent = {
+        id: data.id as string, type, title: data.title as string,
+        date: data.date as string, slot: (data.slot as string) || "",
+        courtIds: [], maxPlaces: data.max_places as number | undefined,
+        desc: (data.description as string) || "", createdAt: data.created_at as string,
+      };
+      setEvents(prev => [...prev, ev].sort((a, b) => a.date.localeCompare(b.date)));
+    }
     setForm({ title: "", date: "", slot: "", desc: "", maxPlaces: 8 });
     setShowForm(false);
   };
 
-  const deleteEvent = (id: string) => {
-    const updated = events.filter(e => e.id !== id);
-    localStorage.setItem(STORAGE_EVENTS, JSON.stringify(updated));
-    setEvents(updated);
+  const deleteEvent = async (id: string) => {
+    await supabase.from("events").delete().eq("id", id);
+    setEvents(prev => prev.filter(e => e.id !== id));
   };
 
   if (!open || !user) return null;
@@ -111,11 +145,6 @@ const MemberDashboard = ({ open, onClose }: Props) => {
 
   const coachingEvents = events.filter(e => e.type === "coaching");
   const soireeEvents   = events.filter(e => e.type === "soiree");
-
-  // Badges du membre (pour l'en-tête)
-  const ub: Record<string, string[]> = JSON.parse(localStorage.getItem(STORAGE_USER_BADGES) || "{}");
-  const ab: { id: string; name: string; emoji: string; color: string }[] = JSON.parse(localStorage.getItem(STORAGE_BADGES) || "[]");
-  const memberBadges = (ub[user.id] || []).map(id => ab.find(b => b.id === id)).filter(Boolean) as typeof ab;
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4"

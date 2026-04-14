@@ -19,6 +19,7 @@ import AdminDashboard from "@/components/garden/AdminDashboard";
 import AccountModal from "@/components/garden/AccountModal";
 import CalendarModal from "@/components/garden/CalendarModal";
 import MemberDashboard from "@/components/garden/MemberDashboard";
+import ResetPasswordModal from "@/components/garden/ResetPasswordModal";
 
 const Index = () => {
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -29,7 +30,7 @@ const Index = () => {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [memberPanelOpen, setMemberPanelOpen] = useState(false);
 
-  const { user } = useAuth();
+  const { user, isRecovering } = useAuth();
   const openLogin = () => { setRegisterOpen(false); setLoginOpen(true); };
   const openRegister = () => { setLoginOpen(false); setRegisterOpen(true); };
   const openAccount = () => setAccountOpen(true);
@@ -70,6 +71,7 @@ const Index = () => {
       />
       <CalendarModal open={calendarOpen} onClose={() => setCalendarOpen(false)} />
       <MemberDashboard open={memberPanelOpen} onClose={() => setMemberPanelOpen(false)} />
+      <ResetPasswordModal open={isRecovering} onClose={() => {}} />
     </>
   );
 };

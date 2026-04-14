@@ -186,7 +186,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
   const handleSaveCredits = async () => {
     if (!selectedMember) return;
     setCreditSaving(true);
-    await supabase.from("profiles").update({ credits: pendingCredits }).eq("id", selectedMember.id);
+    await supabase.rpc("admin_update_credits", { target_user_id: selectedMember.id, new_credits: pendingCredits });
     await refreshUsers();
     setSelectedMember(prev => prev ? { ...prev, credits: pendingCredits } : null);
     setCreditSaving(false);

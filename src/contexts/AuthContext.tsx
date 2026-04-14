@@ -127,7 +127,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           birth_date: data.birthDate,
           level:      data.level,
           role:       "user",
-          credits:    5,
+          credits:    0,
         },
       },
     });

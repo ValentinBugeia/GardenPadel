@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Calendar, Dumbbell, PartyPopper, Plus, ChevronLeft, ChevronRight, Target, Medal, Flower2, Trash2, Shield } from "lucide-react";
+import { X, Calendar, Dumbbell, PartyPopper, Plus, ChevronLeft, ChevronRight, Target, Medal, Flower2, Trash2, Shield, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AdminEvent } from "./AdminDashboard";
 import { supabase } from "@/lib/supabase";
+import EventRegistrantsModal from "./EventRegistrantsModal";
 
 const SLOTS = [
   "08:00 – 09:30","09:30 – 11:00","11:00 – 12:30",
@@ -56,6 +57,7 @@ const MemberDashboard = ({ open, onClose }: Props) => {
   const [events, setEvents]     = useState<AdminEvent[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm]         = useState({ title: "", date: "", slot: "", desc: "", maxPlaces: 8 });
+  const [selectedEvent, setSelectedEvent] = useState<AdminEvent | null>(null);
 
   const [reservations, setReservations] = useState<Reservation[]>([]);
 
@@ -332,7 +334,7 @@ const MemberDashboard = ({ open, onClose }: Props) => {
               ) : (
                 <div className="flex flex-col gap-2">
                   {coachingEvents.map(ev => (
-                    <div key={ev.id} className="flex items-start gap-4 p-4 rounded-2xl border border-garden-blue/20 bg-garden-blue-light">
+                    <div key={ev.id} onClick={() => setSelectedEvent(ev)} className="flex items-start gap-4 p-4 rounded-2xl border border-garden-blue/20 bg-garden-blue-light cursor-pointer hover:brightness-95 transition-all">
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-garden-blue text-white"><Dumbbell className="w-4 h-4" /></div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-foreground">{ev.title}</p>
@@ -344,8 +346,9 @@ const MemberDashboard = ({ open, onClose }: Props) => {
                           <span className="inline-flex items-center gap-1 mt-1 text-[0.65rem] font-semibold text-garden-blue-dark bg-white/60 px-2 py-0.5 rounded-pill">{ev.maxPlaces} places</span>
                         )}
                         {ev.desc && <p className="text-xs text-muted-foreground mt-1">{ev.desc}</p>}
+                        <span className="inline-flex items-center gap-1 mt-1.5 text-[0.65rem] text-muted-foreground"><Users className="w-3 h-3" /> Voir les inscrits</span>
                       </div>
-                      <button onClick={() => deleteEvent(ev.id)} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors shrink-0">
+                      <button onClick={e => { e.stopPropagation(); deleteEvent(ev.id); }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors shrink-0">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -393,7 +396,7 @@ const MemberDashboard = ({ open, onClose }: Props) => {
               ) : (
                 <div className="flex flex-col gap-2">
                   {soireeEvents.map(ev => (
-                    <div key={ev.id} className="flex items-start gap-4 p-4 rounded-2xl border border-garden-pink/20 bg-garden-pink-light">
+                    <div key={ev.id} onClick={() => setSelectedEvent(ev)} className="flex items-start gap-4 p-4 rounded-2xl border border-garden-pink/20 bg-garden-pink-light cursor-pointer hover:brightness-95 transition-all">
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-garden-pink text-white"><PartyPopper className="w-4 h-4" /></div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-foreground">{ev.title}</p>
@@ -402,8 +405,9 @@ const MemberDashboard = ({ open, onClose }: Props) => {
                           {ev.slot && ` · ${ev.slot}`}
                         </p>
                         {ev.desc && <p className="text-xs text-muted-foreground mt-1">{ev.desc}</p>}
+                        <span className="inline-flex items-center gap-1 mt-1.5 text-[0.65rem] text-muted-foreground"><Users className="w-3 h-3" /> Voir les inscrits</span>
                       </div>
-                      <button onClick={() => deleteEvent(ev.id)} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors shrink-0">
+                      <button onClick={e => { e.stopPropagation(); deleteEvent(ev.id); }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors shrink-0">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -416,6 +420,7 @@ const MemberDashboard = ({ open, onClose }: Props) => {
         </div>
       </div>
     </div>
+    <EventRegistrantsModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
   );
 };
 

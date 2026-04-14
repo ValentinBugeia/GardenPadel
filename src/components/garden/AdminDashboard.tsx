@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil, Mail, MapPin, CreditCard, Ban, UserX, ChevronRight as ArrowRight } from "lucide-react";
+import EventRegistrantsModal from "./EventRegistrantsModal";
 import flowerBlue from "@/assets/flower-blue.png";
 import { useAuth, type User } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -141,6 +142,9 @@ const AdminDashboard = ({ open, onClose }: Props) => {
 
   // Reservations state
   const [reservations, setReservations] = useState<Reservation[]>([]);
+
+  // Event detail state
+  const [selectedEvent, setSelectedEvent] = useState<AdminEvent | null>(null);
 
   // Member detail state
   const [selectedMember, setSelectedMember] = useState<User | null>(null);
@@ -786,8 +790,13 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                   {events.map(ev => {
                     const cfg = EVENT_TYPES.find(t => t.value === ev.type)!;
                     const courts = COURTS.filter(c => ev.courtIds.includes(c.id));
+                    const isClickable = ev.type === "coaching" || ev.type === "tournoi" || ev.type === "soiree";
                     return (
-                      <div key={ev.id} className={`flex items-start gap-4 p-4 rounded-2xl border ${cfg.light} border-foreground/8`}>
+                      <div
+                        key={ev.id}
+                        onClick={isClickable ? () => setSelectedEvent(ev) : undefined}
+                        className={`flex items-start gap-4 p-4 rounded-2xl border ${cfg.light} border-foreground/8 ${isClickable ? "cursor-pointer hover:brightness-95 transition-all" : ""}`}
+                      >
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cfg.color}`}>{cfg.icon}</div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
@@ -812,8 +821,16 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                                 </span>
                               )}
                               {ev.desc && <p className="text-xs text-muted-foreground mt-1">{ev.desc}</p>}
+                              {isClickable && (
+                                <span className="inline-flex items-center gap-1 mt-1.5 text-[0.65rem] text-muted-foreground">
+                                  <Users className="w-3 h-3" /> Voir les inscrits
+                                </span>
+                              )}
                             </div>
-                            <button onClick={() => deleteEvent(ev.id)} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors shrink-0">
+                            <button
+                              onClick={e => { e.stopPropagation(); deleteEvent(ev.id); }}
+                              className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+                            >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -972,6 +989,7 @@ const AdminDashboard = ({ open, onClose }: Props) => {
         )}
       </div>
     </div>
+    <EventRegistrantsModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
   );
 };
 

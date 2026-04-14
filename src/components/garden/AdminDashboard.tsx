@@ -397,7 +397,14 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-garden-blue-light to-garden-pink-light flex items-center justify-center text-xs font-bold text-garden-blue-dark shrink-0">{u.firstName[0]}{u.lastName[0]}</div>
-                          <span className="font-semibold text-foreground">{u.firstName} {u.lastName}</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-foreground">{u.firstName} {u.lastName}</span>
+                            {u.role === "admin" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.6rem] font-bold bg-garden-blue text-white w-fit">
+                                <Shield className="w-2.5 h-2.5" /> Administrateur
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-muted-foreground">{u.email}</td>
@@ -636,7 +643,12 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-foreground truncate">{u.firstName} {u.lastName}</p>
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {memberBadges.length === 0 ? (
+                              {u.role === "admin" && (
+                                <span className="inline-flex items-center gap-1 text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-garden-blue text-white">
+                                  <Shield className="w-2.5 h-2.5" /> Administrateur
+                                </span>
+                              )}
+                              {memberBadges.length === 0 && u.role !== "admin" ? (
                                 <span className="text-[0.65rem] text-muted-foreground italic">Aucun badge</span>
                               ) : memberBadges.map(badge => (
                                 <button key={badge.id} onClick={() => toggleUserBadge(u.id, badge.id)} title="Cliquer pour retirer"
@@ -822,9 +834,17 @@ const AdminDashboard = ({ open, onClose }: Props) => {
                 </div>
                 <div className="text-center">
                   <p className="font-black text-foreground">{selectedMember.firstName} {selectedMember.lastName}</p>
-                  <span className={`inline-block px-2.5 py-0.5 rounded-pill text-[0.7rem] font-bold mt-1 ${LEVEL_COLORS[selectedMember.level] || "bg-muted text-muted-foreground"}`}>
-                    <Trophy className="w-3 h-3 inline mr-1" />{selectedMember.level}
-                  </span>
+                  <div className="flex flex-wrap justify-center gap-1.5 mt-1.5">
+                    {selectedMember.role === "admin" ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.7rem] font-bold bg-garden-blue text-white">
+                        <Shield className="w-3 h-3" /> Administrateur
+                      </span>
+                    ) : (
+                      <span className={`inline-block px-2.5 py-0.5 rounded-pill text-[0.7rem] font-bold ${LEVEL_COLORS[selectedMember.level] || "bg-muted text-muted-foreground"}`}>
+                        <Trophy className="w-3 h-3 inline mr-1" />{selectedMember.level}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 

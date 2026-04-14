@@ -30,10 +30,12 @@ interface AuthContextType {
   user: User | null;
   users: User[];
   loading: boolean;
+  isRecovering: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateUser: (data: Partial<Pick<User, "firstName" | "lastName" | "email" | "address" | "birthDate" | "level" | "credits">>) => Promise<{ success: boolean; error?: string }>;
+  resetPassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
   refreshUsers: () => Promise<void>;
 }
 
@@ -54,9 +56,10 @@ const toUser = (row: Record<string, unknown>): User => ({
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser]       = useState<User | null>(null);
-  const [users, setUsers]     = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser]           = useState<User | null>(null);
+  const [users, setUsers]         = useState<User[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [isRecovering, setIsRecovering] = useState(false);
 
   // ── Chargement de tous les membres ──────────────────────────
   const refreshUsers = async () => {
@@ -90,6 +93,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
+      if (_event === "PASSWORD_RECOVERY") {
+        setIsRecovering(true);
+        return;
+      }
       if (session?.user) {
         loadCurrentUser(session.user.id).then(() => refreshUsers()).catch(() => {});
       } else {
@@ -131,6 +138,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { success: true };
   };
 
+  // ── Réinitialisation mot de passe ───────────────────────────
+  const resetPassword = async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { success: false, error: error.message };
+    setIsRecovering(false);
+    return { success: true };
+  };
+
   // ── Déconnexion ──────────────────────────────────────────────
   const logout = async () => {
     await supabase.auth.signOut();
@@ -161,7 +176,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, users, loading, login, register, logout, updateUser, refreshUsers }}>
+    <AuthContext.Provider value={{ user, users, loading, isRecovering, login, register, logout, updateUser, resetPassword, refreshUsers }}>
       {children}
     </AuthContext.Provider>
   );

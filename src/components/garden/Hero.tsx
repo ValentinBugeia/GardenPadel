@@ -1,5 +1,5 @@
 import { ArrowDown, CalendarDays } from "lucide-react";
-import heroBg from "@/assets/Gemini_Generated_Image_hqkk6phqkk6phqkk.png";
+import heroBg from "@/assets/Gemini_Generated_Image_hqkk6phqkk6phqkk.webp";
 
 interface Props { onBooking: () => void; }
 

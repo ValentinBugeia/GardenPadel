@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, LogOut, Mail, MapPin, Calendar, Trophy, ShieldCheck, Settings, Pencil, Check, AlertCircle, LayoutDashboard, Plus, ShoppingCart } from "lucide-react";
 import { useAuth, type PadelLevel } from "@/contexts/AuthContext";
-import flowerBlue from "@/assets/flower-blue.png";
+import flowerBlue from "@/assets/flower-blue.webp";
 import { supabase } from "@/lib/supabase";
 
 const CREDIT_PACKS = [

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { X, Users, LogOut, Search, Calendar, Target, Medal, Flower2, ChevronLeft, ChevronRight, Plus, Trash2, PartyPopper, Briefcase, Dumbbell, MoreHorizontal, Trophy, Shield, Check, Pencil, Mail, MapPin, CreditCard, Ban, UserX, ChevronRight as ArrowRight, MessageSquare, Circle } from "lucide-react";
 import EventRegistrantsModal from "./EventRegistrantsModal";
-import flowerBlue from "@/assets/flower-blue.png";
+import flowerBlue from "@/assets/flower-blue.webp";
 import { useAuth, type User } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 

@@ -1,21 +1,20 @@
-import { useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
 const NotFound = () => {
-  const location = useLocation();
-
-  useEffect(() => {
-    console.error("404 Error: User attempted to access non-existent route:", location.pathname);
-  }, [location.pathname]);
-
+  const navigate = useNavigate();
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">404</h1>
-        <p className="mb-4 text-xl text-muted-foreground">Oops! Page not found</p>
-        <a href="/" className="text-primary underline hover:text-primary/90">
-          Return to Home
-        </a>
+    <div className="flex min-h-screen items-center justify-center bg-[#0a1a2e]">
+      <div className="text-center px-6">
+        <p className="text-garden-blue text-[0.75rem] font-bold uppercase tracking-[0.2em] mb-4">Erreur 404</p>
+        <h1 className="text-[clamp(5rem,15vw,10rem)] font-black text-white leading-none tracking-tighter mb-4">404</h1>
+        <p className="text-lg text-white/60 mb-8">Cette page n'existe pas.</p>
+        <button
+          onClick={() => navigate("/")}
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-pill font-semibold text-sm bg-garden-blue text-white hover:bg-garden-blue-dark transition-all hover:-translate-y-0.5"
+        >
+          <ArrowLeft className="w-4 h-4" /> Retour à l'accueil
+        </button>
       </div>
     </div>
   );

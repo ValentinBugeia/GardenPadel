@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { X, ChevronLeft, ChevronRight, Target, Medal, Flower2, CheckCircle2, Clock, Search, UserPlus, XCircle } from "lucide-react";
 import { useAuth, type User } from "@/contexts/AuthContext";
-import flowerBlue from "@/assets/flower-blue.png";
+import flowerBlue from "@/assets/flower-blue.webp";
 
 import { supabase } from "@/lib/supabase";
 

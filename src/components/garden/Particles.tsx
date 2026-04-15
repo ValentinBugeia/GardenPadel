@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import flowerBlue from "@/assets/flower-blue.png";
-import flowerPink from "@/assets/flower-pink.png";
+import flowerBlue from "@/assets/flower-blue.webp";
+import flowerPink from "@/assets/flower-pink.webp";
 
 const flowers = [flowerBlue, flowerPink];
 
